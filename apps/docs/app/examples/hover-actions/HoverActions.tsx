@@ -89,7 +89,6 @@ export function HoverActions({ prerenderedDiff }: HoverActionsProps) {
                   position: 'absolute',
                   bottom: '100%',
                   left: 0,
-                  marginBottom: 4,
                   whiteSpace: 'nowrap',
                 }}
               >
