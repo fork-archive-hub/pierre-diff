@@ -1,8 +1,9 @@
 'use client';
 
-import { IconCommit } from '@/components/icons';
+import { IconArrowDownRight, IconCommit } from '@/components/icons';
 import { FileDiff } from '@pierre/diffs/react';
 import type { PreloadFileDiffResult } from '@pierre/diffs/ssr';
+import Link from 'next/link';
 import { useState } from 'react';
 
 // =============================================================================
@@ -131,17 +132,14 @@ export function GitBlameView({ prerenderedDiff }: GitBlameViewProps) {
         />
       </div>
 
-      <div className="rounded-lg border border-neutral-800 bg-neutral-900/50 p-4">
-        <h3 className="mb-2 text-sm font-medium text-neutral-300">
-          How it works
-        </h3>
-        <p className="text-sm text-neutral-400">
-          The <code className="text-neutral-300">onLineEnter</code> callback
-          updates React state with the hovered line number. This triggers a
-          re-render, and{' '}
-          <code className="text-neutral-300">renderHoverUtility</code> uses that
-          state to look up blame data and render an inline tooltip. In a real
-          app, you'd fetch this from your git provider's API.
+      <div className="flex gap-1">
+        <IconArrowDownRight className="text-muted-foreground my-[2px] shrink-0 opacity-50" />
+        <p className="text-muted-foreground text-sm">
+          The <code>onLineEnter</code> callback updates React state with the
+          hovered line number. This triggers a re-render, and{' '}
+          <code>renderHoverUtility</code> uses that state to look up blame data
+          and render an inline tooltip. In a real app, you'd fetch this from
+          your git provider's API.
         </p>
       </div>
     </div>
