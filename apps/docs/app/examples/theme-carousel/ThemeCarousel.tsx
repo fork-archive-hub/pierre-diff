@@ -3,7 +3,7 @@
 import { IconChevron } from '@/components/icons';
 import { FileDiff } from '@pierre/diffs/react';
 import type { PreloadFileDiffResult } from '@pierre/diffs/ssr';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { THEMES } from './constants';
 
@@ -17,6 +17,8 @@ interface ThemeCarouselProps {
 
 export function ThemeCarousel({ prerenderedDiff }: ThemeCarouselProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [themeBg, setThemeBg] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const currentTheme = THEMES[currentIndex];
 
   const prev = () =>
@@ -24,18 +26,60 @@ export function ThemeCarousel({ prerenderedDiff }: ThemeCarouselProps) {
   const next = () =>
     setCurrentIndex((i) => (i === THEMES.length - 1 ? 0 : i + 1));
 
-  // Colors based on current theme type
+  // Use MutationObserver to detect when the pierre-diffs style changes
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const updateBg = () => {
+      const diffsElement = container.querySelector('pierre-diffs');
+      if (diffsElement instanceof HTMLElement) {
+        // Read directly from inline style attribute
+        const style = diffsElement.getAttribute('style') || '';
+        const match = style.match(/--diffs-bg:\s*([^;]+)/);
+        if (match) {
+          setThemeBg(match[1].trim());
+        }
+      }
+    };
+
+    // Initial check
+    updateBg();
+
+    // Watch for style attribute changes on pierre-diffs
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (
+          mutation.type === 'attributes' &&
+          mutation.attributeName === 'style'
+        ) {
+          updateBg();
+        }
+      }
+    });
+
+    const diffsElement = container.querySelector('pierre-diffs');
+    if (diffsElement) {
+      observer.observe(diffsElement, { attributes: true });
+    }
+
+    return () => observer.disconnect();
+  }, [currentIndex]);
+
+  // Colors based on current theme
   const isDark = currentTheme.type === 'dark';
-  const containerBg = isDark ? 'bg-neutral-950' : 'bg-neutral-100';
   const borderColor = isDark ? 'border-neutral-800' : 'border-neutral-300';
   const textColor = isDark ? 'text-neutral-200' : 'text-neutral-800';
   const mutedText = isDark ? 'text-neutral-500' : 'text-neutral-500';
-  const pillBg = isDark ? 'bg-neutral-800' : 'bg-neutral-200';
+  const pillBg = isDark ? 'bg-white/10' : 'bg-black/10';
+
+  // Use theme bg from CSS variable, fallback to constant
+  const backgroundColor = themeBg || currentTheme.bg;
 
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-medium">Theme Carousel</h2>
+        <h2 className="text-2xl font-medium">Theme carousel</h2>
         <p className="text-muted-foreground">
           Browse through {THEMES.length} beautiful syntax themes. Use any Shiki
           theme or our custom Pierre themes designed for optimal diff
@@ -44,26 +88,27 @@ export function ThemeCarousel({ prerenderedDiff }: ThemeCarouselProps) {
       </div>
 
       <div
-        className={`overflow-hidden rounded-xl border ${borderColor} ${containerBg} transition-colors duration-300`}
+        ref={containerRef}
+        className={`overflow-hidden rounded-xl border ${borderColor} transition-colors duration-300`}
+        style={{ backgroundColor }}
       >
-        {/* Header with navigation */}
         <div
-          className={`flex items-center justify-between border-b ${borderColor} px-4 py-3`}
+          className={`flex items-center justify-between ${borderColor} px-4 py-3`}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
             <button
               onClick={prev}
-              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg ${pillBg} ${textColor} transition-opacity hover:opacity-80`}
-              aria-label="Previous theme"
+              className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg ${pillBg} ${textColor} transition-opacity hover:opacity-80`}
+              aria-label="Previous"
             >
-              <IconChevron size={16} style={{ transform: 'rotate(90deg)' }} />
+              <IconChevron size={12} style={{ transform: 'rotate(90deg)' }} />
             </button>
             <button
               onClick={next}
-              className={`flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg ${pillBg} ${textColor} transition-opacity hover:opacity-80`}
-              aria-label="Next theme"
+              className={`flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg ${pillBg} ${textColor} transition-opacity hover:opacity-80`}
+              aria-label="Next"
             >
-              <IconChevron size={16} style={{ transform: 'rotate(-90deg)' }} />
+              <IconChevron size={12} style={{ transform: 'rotate(-90deg)' }} />
             </button>
           </div>
 
@@ -75,7 +120,7 @@ export function ThemeCarousel({ prerenderedDiff }: ThemeCarouselProps) {
           </div>
 
           <div
-            className={`rounded-full px-3 py-1 text-xs font-medium ${pillBg} ${
+            className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${pillBg} ${
               isDark ? 'text-neutral-300' : 'text-neutral-700'
             }`}
           >
@@ -83,9 +128,8 @@ export function ThemeCarousel({ prerenderedDiff }: ThemeCarouselProps) {
           </div>
         </div>
 
-        {/* Theme indicator dots */}
         <div
-          className={`flex justify-center gap-1.5 border-b ${borderColor} py-2`}
+          className={`flex justify-center gap-1.5 border-b ${borderColor} pb-4`}
         >
           {THEMES.map((theme, i) => (
             <button

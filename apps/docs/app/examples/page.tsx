@@ -1,7 +1,7 @@
 import Footer from '@/components/Footer';
-import { Header } from '@/components/Header';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
 
+import { ExamplesLayout } from './ExamplesLayout';
 import { AICodeReview } from './ai-code-review/AICodeReview';
 import { AI_CODE_REVIEW_EXAMPLE } from './ai-code-review/constants';
 import { FullCustomHeader } from './custom-chrome/FullCustomHeader';
@@ -34,27 +34,39 @@ export default async function ExamplesPage() {
 
   return (
     <div className="mx-auto min-h-screen max-w-5xl px-5 xl:max-w-[80rem]">
-      <Header className="-mb-[1px]" />
+      <ExamplesLayout>
+        <div className="min-w-0">
+          <section className="space-y-6 py-6">
+            <div className="space-y-3">
+              <h1 className="text-muted-foreground max-w-xl text-lg">
+                A collection of examples showcasing how you can customize and
+                extend <code className="text-foreground">@pierre/diffs</code>.
+              </h1>
+            </div>
+          </section>
 
-      <section className="space-y-6 py-12">
-        <div className="space-y-3">
-          <h1 className="text-4xl font-bold">Examples</h1>
-          <p className="text-muted-foreground max-w-2xl text-lg">
-            Explore creative ways to customize and extend{' '}
-            <code className="text-foreground">@pierre/diffs</code>. These
-            examples showcase custom headers, footers, annotations, and more.
-          </p>
+          <section className="space-y-20 pb-16">
+            <div id="theme-carousel" className="scroll-mt-24">
+              <ThemeCarousel prerenderedDiff={themeCarouselDiff} />
+            </div>
+            <div id="custom-chrome" className="scroll-mt-24">
+              <FullCustomHeader prerenderedDiff={customHeaderDiff} />
+            </div>
+            <div id="hover-actions" className="scroll-mt-24">
+              <HoverActions prerenderedDiff={hoverActionsDiff} />
+            </div>
+            <div id="ai-code-review" className="scroll-mt-24">
+              <AICodeReview prerenderedDiff={aiCodeReviewDiff} />
+            </div>
+            <div id="pr-review" className="scroll-mt-24">
+              <PRReview prerenderedDiffs={prReviewDiffs} />
+            </div>
+            <div id="git-blame" className="scroll-mt-24">
+              <GitBlameView prerenderedDiff={gitBlameDiff} />
+            </div>
+          </section>
         </div>
-      </section>
-
-      <section className="space-y-20 pb-16">
-        <ThemeCarousel prerenderedDiff={themeCarouselDiff} />
-        <FullCustomHeader prerenderedDiff={customHeaderDiff} />
-        <HoverActions prerenderedDiff={hoverActionsDiff} />
-        <AICodeReview prerenderedDiff={aiCodeReviewDiff} />
-        <PRReview prerenderedDiffs={prReviewDiffs} />
-        <GitBlameView prerenderedDiff={gitBlameDiff} />
-      </section>
+      </ExamplesLayout>
 
       <Footer />
     </div>

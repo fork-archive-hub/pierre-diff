@@ -3,26 +3,68 @@ import { type FileContents, parseDiffFromFile } from '@pierre/diffs';
 import type { PreloadFileDiffOptions } from '@pierre/diffs/ssr';
 
 export const THEMES = [
-  { name: 'pierre-dark', label: 'Pierre Dark', type: 'dark' as const },
-  { name: 'pierre-light', label: 'Pierre Light', type: 'light' as const },
-  { name: 'github-dark', label: 'GitHub Dark', type: 'dark' as const },
-  { name: 'github-light', label: 'GitHub Light', type: 'light' as const },
-  { name: 'dracula', label: 'Dracula', type: 'dark' as const },
-  { name: 'nord', label: 'Nord', type: 'dark' as const },
-  { name: 'one-dark-pro', label: 'One Dark Pro', type: 'dark' as const },
-  { name: 'vitesse-dark', label: 'Vitesse Dark', type: 'dark' as const },
-  { name: 'vitesse-light', label: 'Vitesse Light', type: 'light' as const },
+  {
+    name: 'pierre-dark',
+    label: 'Pierre Dark',
+    type: 'dark' as const,
+    bg: '#070707',
+  },
+  {
+    name: 'pierre-light',
+    label: 'Pierre Light',
+    type: 'light' as const,
+    bg: '#ffffff',
+  },
+  {
+    name: 'github-dark',
+    label: 'GitHub Dark',
+    type: 'dark' as const,
+    bg: '#0d1117',
+  },
+  {
+    name: 'github-light',
+    label: 'GitHub Light',
+    type: 'light' as const,
+    bg: '#ffffff',
+  },
+  { name: 'dracula', label: 'Dracula', type: 'dark' as const, bg: '#282a36' },
+  { name: 'nord', label: 'Nord', type: 'dark' as const, bg: '#2e3440' },
+  {
+    name: 'one-dark-pro',
+    label: 'One Dark Pro',
+    type: 'dark' as const,
+    bg: '#282c34',
+  },
+  {
+    name: 'vitesse-dark',
+    label: 'Vitesse Dark',
+    type: 'dark' as const,
+    bg: '#121212',
+  },
+  {
+    name: 'vitesse-light',
+    label: 'Vitesse Light',
+    type: 'light' as const,
+    bg: '#ffffff',
+  },
   {
     name: 'catppuccin-mocha',
     label: 'Catppuccin Mocha',
     type: 'dark' as const,
+    bg: '#1e1e2e',
   },
   {
     name: 'catppuccin-latte',
     label: 'Catppuccin Latte',
     type: 'light' as const,
+    bg: '#eff1f5',
   },
-  { name: 'tokyo-night', label: 'Tokyo Night', type: 'dark' as const },
+  {
+    name: 'tokyo-night',
+    label: 'Tokyo Night',
+    type: 'dark' as const,
+    bg: '#1a1b26',
+  },
 ] as const;
 
 const OLD_FILE: FileContents = {
