@@ -32,7 +32,7 @@ export function templateRender(
 }
 
 export interface FileTreeProps {
-  options: FileTreeOptions;
+  options: Omit<FileTreeOptions, 'initialFiles'>;
   className?: string;
   style?: React.CSSProperties;
   prerenderedHTML?: string;
@@ -43,9 +43,16 @@ export interface FileTreeProps {
    */
   containerId?: string;
 
+  // Default (uncontrolled) files
+  initialFiles?: string[];
+
+  // Controlled files
+  files?: string[];
+  onFilesChange?: (files: string[]) => void;
+
   // Default (uncontrolled) state
-  defaultExpandedItems?: string[];
-  defaultSelectedItems?: string[];
+  initialExpandedItems?: string[];
+  initialSelectedItems?: string[];
 
   // Controlled state
   expandedItems?: string[];
@@ -61,8 +68,11 @@ export function FileTree({
   style,
   prerenderedHTML,
   containerId,
-  defaultExpandedItems,
-  defaultSelectedItems,
+  initialFiles,
+  files,
+  onFilesChange,
+  initialExpandedItems,
+  initialSelectedItems,
   expandedItems,
   selectedItems,
   onExpandedItemsChange,
@@ -72,8 +82,11 @@ export function FileTree({
   const children = renderFileTreeChildren();
   const { ref } = useFileTreeInstance({
     options,
-    defaultExpandedItems,
-    defaultSelectedItems,
+    initialFiles,
+    files,
+    onFilesChange,
+    initialExpandedItems,
+    initialSelectedItems,
     expandedItems,
     selectedItems,
     onExpandedItemsChange,
@@ -98,7 +111,15 @@ export function FileTree({
     return <></>;
   }
   return (
-    <FILE_TREE_TAG_NAME ref={ref} className={className} style={style}>
+    <FILE_TREE_TAG_NAME
+      ref={ref}
+      className={className}
+      style={style}
+      // Declarative shadow DOM: the browser consumes <template shadowrootmode>
+      // during document parsing (before React hydrates), so the DOM will always
+      // differ from what the server rendered. This is expected and harmless.
+      suppressHydrationWarning
+    >
       {templateRender(children, prerenderedHTML)}
     </FILE_TREE_TAG_NAME>
   );

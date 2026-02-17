@@ -8,11 +8,18 @@ import {
 } from '../../FileTree';
 
 interface UseFileTreeInstanceProps {
-  options: FileTreeOptions;
+  options: Omit<FileTreeOptions, 'initialFiles'>;
+
+  // Default (uncontrolled) files
+  initialFiles?: string[];
+
+  // Controlled files
+  files?: string[];
+  onFilesChange?: (files: string[]) => void;
 
   // Default (uncontrolled) state
-  defaultExpandedItems?: string[];
-  defaultSelectedItems?: string[];
+  initialExpandedItems?: string[];
+  initialSelectedItems?: string[];
 
   // Controlled state
   expandedItems?: string[];
@@ -28,8 +35,11 @@ interface UseFileTreeInstanceReturn {
 
 export function useFileTreeInstance({
   options,
-  defaultExpandedItems,
-  defaultSelectedItems,
+  initialFiles,
+  files,
+  onFilesChange,
+  initialExpandedItems,
+  initialSelectedItems,
   expandedItems,
   selectedItems,
   onExpandedItemsChange,
@@ -41,23 +51,31 @@ export function useFileTreeInstance({
 
   // Keep a ref to the latest state-related props so the ref callback can read
   // them at creation time without including them as useMemo deps.
-  const statePropsRef = useRef<FileTreeStateConfig>({
+  const statePropsRef = useRef<
+    FileTreeStateConfig & { initialFiles?: string[] }
+  >({
+    files,
+    initialFiles,
+    onFilesChange,
     expandedItems,
     selectedItems,
     onExpandedItemsChange,
     onSelectedItemsChange,
     onSelection,
-    defaultExpandedItems,
-    defaultSelectedItems,
+    initialExpandedItems,
+    initialSelectedItems,
   });
   statePropsRef.current = {
+    files,
+    initialFiles,
+    onFilesChange,
     expandedItems,
     selectedItems,
     onExpandedItemsChange,
     onSelectedItemsChange,
     onSelection,
-    defaultExpandedItems,
-    defaultSelectedItems,
+    initialExpandedItems,
+    initialSelectedItems,
   };
 
   // Ref callback that handles mount/unmount and re-runs when options change.
@@ -106,18 +124,23 @@ export function useFileTreeInstance({
       const createInstance = (existingId?: string): FileTree => {
         const sp = statePropsRef.current;
         return new FileTree(
-          { ...options, id: existingId },
+          {
+            ...options,
+            initialFiles: sp.initialFiles ?? sp.files ?? [],
+            id: existingId,
+          },
           {
             // Use controlled values as initial state, but do NOT pass them as
             // controlled `expandedItems`/`selectedItems` — those bake into
             // config.state in the Preact Root and override imperative updates.
             // Subsequent controlled updates flow via the useEffect below calling
             // setExpandedItems/setSelectedItems imperatively.
-            defaultExpandedItems: sp.defaultExpandedItems ?? sp.expandedItems,
-            defaultSelectedItems: sp.defaultSelectedItems ?? sp.selectedItems,
+            initialExpandedItems: sp.initialExpandedItems ?? sp.expandedItems,
+            initialSelectedItems: sp.initialSelectedItems ?? sp.selectedItems,
             onExpandedItemsChange: sp.onExpandedItemsChange,
             onSelectedItemsChange: sp.onSelectedItemsChange,
             onSelection: sp.onSelection,
+            onFilesChange: sp.onFilesChange,
           }
         );
       };
@@ -165,6 +188,13 @@ export function useFileTreeInstance({
     [options]
   );
 
+  // Sync controlled files imperatively (no tree recreation)
+  useEffect(() => {
+    if (files !== undefined && instanceRef.current != null) {
+      instanceRef.current.setFiles(files);
+    }
+  }, [files]);
+
   // Sync controlled expanded items imperatively (no tree recreation)
   useEffect(() => {
     if (expandedItems !== undefined && instanceRef.current != null) {
@@ -185,8 +215,14 @@ export function useFileTreeInstance({
       onExpandedItemsChange,
       onSelectedItemsChange,
       onSelection,
+      onFilesChange,
     });
-  }, [onExpandedItemsChange, onSelectedItemsChange, onSelection]);
+  }, [
+    onExpandedItemsChange,
+    onSelectedItemsChange,
+    onSelection,
+    onFilesChange,
+  ]);
 
   return { ref };
 }

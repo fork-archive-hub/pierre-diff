@@ -52,10 +52,11 @@ export interface FileTreeCallbacks {
   onExpandedItemsChange?: (items: string[]) => void;
   onSelectedItemsChange?: (items: string[]) => void;
   onSelection?: (items: FileTreeSelectionItem[]) => void;
+  onFilesChange?: (files: string[]) => void;
 }
 
 export interface FileTreeOptions {
-  files: string[];
+  initialFiles: string[];
   id?: string;
   flattenEmptyDirectories?: boolean;
   useLazyDataLoader?: boolean;
@@ -66,17 +67,19 @@ export interface FileTreeOptions {
 
 export interface FileTreeStateConfig {
   // Initial state (uncontrolled - used once at creation)
-  defaultExpandedItems?: string[];
-  defaultSelectedItems?: string[];
+  initialExpandedItems?: string[];
+  initialSelectedItems?: string[];
 
   // Controlled state (applied every render, overrides internal state)
   expandedItems?: string[];
   selectedItems?: string[];
+  files?: string[];
 
   // State change callbacks
   onExpandedItemsChange?: (items: string[]) => void;
   onSelectedItemsChange?: (items: string[]) => void;
   onSelection?: (items: FileTreeSelectionItem[]) => void;
+  onFilesChange?: (files: string[]) => void;
 }
 
 const isBrowser = typeof document !== 'undefined';
@@ -113,6 +116,7 @@ export class FileTree {
         onExpandedItemsChange: stateConfig.onExpandedItemsChange,
         onSelectedItemsChange: stateConfig.onSelectedItemsChange,
         onSelection: stateConfig.onSelection,
+        onFilesChange: stateConfig.onFilesChange,
       },
     };
   }
@@ -309,8 +313,16 @@ export class FileTree {
   // --- Heavier updates (re-render) ---
 
   setFiles(files: string[]): void {
-    this.options = { ...this.options, files };
+    if (this.options.initialFiles === files) {
+      return;
+    }
+    this.options = { ...this.options, initialFiles: files };
+    this.callbacksRef.current.onFilesChange?.(files);
     this.rerender();
+  }
+
+  getFiles(): string[] {
+    return this.options.initialFiles;
   }
 
   setOptions(
@@ -329,10 +341,13 @@ export class FileTree {
     if (state?.onSelection !== undefined) {
       this.callbacksRef.current.onSelection = state.onSelection;
     }
+    if (state?.onFilesChange !== undefined) {
+      this.callbacksRef.current.onFilesChange = state.onFilesChange;
+    }
 
     // Check if structural props changed (require re-render)
     const structuralKeys = [
-      'files',
+      'initialFiles',
       'flattenEmptyDirectories',
       'useLazyDataLoader',
       'config',
@@ -345,12 +360,22 @@ export class FileTree {
       }
     }
 
-    this.options = { ...this.options, ...options };
+    const nextFiles = state?.files;
+    const stateFilesChanged =
+      nextFiles !== undefined && this.options.initialFiles !== nextFiles;
+    this.options = {
+      ...this.options,
+      ...options,
+      ...(nextFiles !== undefined && { initialFiles: nextFiles }),
+    };
     if (state != null) {
       this.stateConfig = { ...this.stateConfig, ...state };
     }
 
-    if (needsRerender) {
+    if (needsRerender || stateFilesChanged) {
+      if (stateFilesChanged && nextFiles !== undefined) {
+        this.callbacksRef.current.onFilesChange?.(nextFiles);
+      }
       this.rerender();
     } else {
       // State-only changes - use imperative methods

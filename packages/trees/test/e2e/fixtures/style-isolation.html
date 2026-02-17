@@ -33,12 +33,12 @@
 
       const fileTree = new FileTree(
         {
-          files: ['README.md', 'src/index.ts'],
+          initialFiles: ['README.md', 'src/index.ts'],
           flattenEmptyDirectories: false,
         },
         {
-          defaultExpandedItems: ['src'],
-          defaultSelectedItems: ['src/index.ts'],
+          initialExpandedItems: ['src'],
+          initialSelectedItems: ['src/index.ts'],
         }
       );
       fileTree.render({ fileTreeContainer: host });

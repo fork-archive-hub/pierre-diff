@@ -108,6 +108,7 @@ export interface TestTree {
   setSelectedItems: (paths: string[]) => void;
   expandItem: (path: string) => void;
   collapseItem: (path: string) => void;
+  toggleItemExpanded: (path: string) => void;
   getExpandedItems: () => string[];
   getSelectedItems: () => string[];
 }
@@ -122,26 +123,26 @@ export function createTestTree(
   files: string[],
   config: TestConfig,
   opts: {
-    defaultExpandedItems?: string[];
-    defaultSelectedItems?: string[];
+    initialExpandedItems?: string[];
+    initialSelectedItems?: string[];
   } = {}
 ): TestTree {
   const { flattenEmptyDirectories } = config;
-  const { defaultExpandedItems, defaultSelectedItems } = opts;
+  const { initialExpandedItems, initialSelectedItems } = opts;
 
   const dataLoader = config.createLoader(files, { flattenEmptyDirectories });
   const { pathToId, idToPath } = buildMapsFromLoader(dataLoader, 'root');
 
   const mappedExpandedItems =
-    defaultExpandedItems != null
-      ? expandPathsWithAncestors(defaultExpandedItems, pathToId, {
+    initialExpandedItems != null
+      ? expandPathsWithAncestors(initialExpandedItems, pathToId, {
           flattenEmptyDirectories,
         })
       : undefined;
 
   const mappedSelectedItems =
-    defaultSelectedItems != null
-      ? defaultSelectedItems
+    initialSelectedItems != null
+      ? initialSelectedItems
           .map((path) => {
             if (path.startsWith(FLATTENED_PREFIX)) {
               return pathToId.get(path);
@@ -269,6 +270,23 @@ export function createTestTree(
     tree.rebuildTree();
   };
 
+  // Mirror FileTree.toggleItemExpanded
+  const toggleItemExpanded = (path: string) => {
+    const idsToCheck = new Set<string>();
+    const id = pathToId.get(path);
+    if (id != null) idsToCheck.add(id);
+    const flatId = pathToId.get(FLATTENED_PREFIX + path);
+    if (flatId != null) idsToCheck.add(flatId);
+    if (idsToCheck.size === 0) return;
+    const currentIds = tree.getState().expandedItems ?? [];
+    const isExpanded = currentIds.some((id) => idsToCheck.has(id));
+    if (isExpanded) {
+      collapseItem(path);
+    } else {
+      expandItem(path);
+    }
+  };
+
   // Mirror FileTree.getExpandedItems
   const getExpandedItems = (): string[] => {
     const ids = tree.getState().expandedItems ?? [];
@@ -300,6 +318,7 @@ export function createTestTree(
     setSelectedItems,
     expandItem,
     collapseItem,
+    toggleItemExpanded,
     getExpandedItems,
     getSelectedItems,
   };

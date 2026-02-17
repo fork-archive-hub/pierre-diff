@@ -4,7 +4,7 @@ import type {
   FileTreeStateConfig,
 } from '@pierre/trees';
 
-export const sampleFileList: string[] = [
+const sampleFileList: string[] = [
   'README.md',
   'package.json',
   'Build/index.mjs',
@@ -27,14 +27,14 @@ export const sampleFileList: string[] = [
 
 export const sharedDemoFileTreeOptions: FileTreeOptions = {
   flattenEmptyDirectories: true,
-  files: sampleFileList,
+  initialFiles: sampleFileList,
   config: {
     fileTreeSearchMode: 'collapse-non-matches',
   },
 };
 
 export const sharedDemoStateConfig: FileTreeStateConfig = {
-  defaultExpandedItems: ['Build/assets/images/social'],
+  initialExpandedItems: ['Build/assets/images/social'],
   onSelection: (selection: FileTreeSelectionItem[]) => {
     console.log('selection', selection);
   },
