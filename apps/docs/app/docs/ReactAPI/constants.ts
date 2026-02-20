@@ -72,6 +72,14 @@ interface DiffOptions {
 
   // What to show between diff hunks:
   // 'line-info' (default) - shows collapsed line count, clickable to expand
+  // WebKit/Safari bug in version 26 as of this writing: if you use 
+  // custom renderGutterUtility with hunkSeparators: 'line-info', you may 
+  // experience scroll jumping while moving the mouse.
+  // Recommended: avoid this API by just using enableGutterUtility to render
+  // the default button, or switch to another hunk separator type 
+  // (e.g. 'line-info-basic').
+  // For a status of this bug, visit:
+  // https://bugs.webkit.org/show_bug.cgi?id=308027
   // 'line-info-basic' - slightly more compact full width line-info variant
   // 'metadata' - shows patch format like '@@ -60,6 +60,22 @@'
   // 'simple' - subtle bar separator
@@ -153,8 +161,10 @@ interface DiffOptions {
   // 'line' - highlights only the line content
   lineHoverHighlight: 'disabled',
 
-  // Must be true to enable renderHoverUtility prop
-  enableHoverUtility: false,
+  // Must be true to enable renderGutterUtility prop
+  enableGutterUtility: false,
+  // Deprecated alias: enableHoverUtility
+  // This boolean controls visibility for both built-in and custom gutter utility UI.
 
   // Callbacks for mouse events on diff lines
   onLineClick({ lineNumber, side, event }) {
@@ -168,6 +178,18 @@ interface DiffOptions {
   },
   onLineLeave({ lineNumber, side }) {
     // Fires when mouse leaves a line
+  },
+
+  // Preferred: built-in gutter utility button (+)
+  // No render callback needed; callback receives current hovered line context.
+  // Callback does not control visibility; options.enableGutterUtility does.
+  // If omitted, button clicks bubble to gutter selection interactions.
+  // With enableLineSelection, omit this handler when you want range-based
+  // annotation workflows (use line selection callbacks instead).
+  // Provide this only when button clicks should do something different than
+  // selection. This handler is click-only (no drag/select behavior).
+  onGutterUtilityClick({ lineNumber, side }) {
+    console.log(\`Clicked line \${lineNumber} on \${side}\`);
   },
 }`,
   },
@@ -227,15 +249,36 @@ interface ThreadMetadata {
   )}
 
   // ─────────────────────────────────────────────────────────────
-  // HOVER UTILITY
+  // GUTTER UTILITY
   // ─────────────────────────────────────────────────────────────
 
-  // Render UI in the line number column on hover.
-  // Requires options.enableHoverUtility = true
+  // Preferred: built-in + button (no custom render function).
+  // Callback receives the same hovered line payload shape.
+  // Visibility is still controlled by options.enableGutterUtility.
+  // If omitted, button clicks bubble to gutter selection interactions.
+  // With enableLineSelection, omit this handler for range workflows and use
+  // line selection callbacks instead.
+  // Provide this only when clicks should do something different than selection.
+  // This handler is click-only (no drag/select behavior).
+  onGutterUtilityClick={({ lineNumber, side }) => {
+    console.log(\`Clicked line \${lineNumber} on \${side}\`);
+  }}
+
+  // Advanced: render your own UI in the line number column on hover.
+  // Prefer onGutterUtilityClick unless you need fully custom content.
+  // Requires options.enableGutterUtility = true
+  // Do not combine with onGutterUtilityClick.
+  // WebKit/Safari bug version 26 as of this writing: if you use this custom
+  // API with hunkSeparators: 'line-info', you may see scroll jumping while
+  // moving the mouse.
+  // Recommended: Just enable 'enableGutterUtility' for the default button,
+  // or switch hunk separators to 'line-info-basic', 'metadata', or 'simple'.
+  // For a status of this bug, visit:
+  // https://bugs.webkit.org/show_bug.cgi?id=308027
   //
   // Note: This is NOT reactive - render is not called on every
   // mouse move. Use getHoveredLine() in click handlers.
-  renderHoverUtility={(getHoveredLine) => (
+  renderGutterUtility={(getHoveredLine) => (
     <button
       onClick={() => {
         const { lineNumber, side } = getHoveredLine();
@@ -315,7 +358,7 @@ export function MyDiff() {
 
       // See "Shared Props" tabs for all available props:
       // lineAnnotations, renderAnnotation, renderHeaderMetadata,
-      // renderHoverUtility, selectedLines, className, style, etc.
+      // renderGutterUtility, selectedLines, className, style, etc.
     />
   );
 }`,
@@ -352,7 +395,7 @@ export function MyPatchDiff() {
 
       // See "Shared Props" tabs for all available props:
       // lineAnnotations, renderAnnotation, renderHeaderMetadata,
-      // renderHoverUtility, selectedLines, className, style, etc.
+      // renderGutterUtility, selectedLines, className, style, etc.
     />
   );
 }`,
@@ -394,7 +437,7 @@ export function MyFileDiff() {
 
       // See "Shared Props" tabs for all available props:
       // lineAnnotations, renderAnnotation, renderHeaderMetadata,
-      // renderHoverUtility, selectedLines, className, style, etc.
+      // renderGutterUtility, selectedLines, className, style, etc.
     />
   );
 }`,
@@ -438,7 +481,7 @@ export function CodeFile() {
 
       // The File component supports similar props to the diff components:
       // lineAnnotations, renderAnnotation, renderHeaderMetadata,
-      // renderHoverUtility, selectedLines, className, style, etc.
+      // renderGutterUtility, selectedLines, className, style, etc.
       //
       // Key difference: File uses LineAnnotation (no 'side' property)
       // instead of DiffLineAnnotation since there's only one column.
@@ -543,8 +586,11 @@ interface FileOptions {
   // 'line' - highlights only the line content
   lineHoverHighlight: 'disabled',
 
-  // Must be true to enable renderHoverUtility prop
-  enableHoverUtility: false,
+  // Must be true to enable renderGutterUtility prop
+  enableGutterUtility: false,
+  // Deprecated alias: enableHoverUtility
+  // This boolean controls visibility for both built-in and custom gutter
+  // utility UI.
 
   // Callbacks for mouse events on file lines
   onLineClick({ lineNumber, event }) {
@@ -558,6 +604,18 @@ interface FileOptions {
   },
   onLineLeave({ lineNumber }) {
     // Fires when mouse leaves a line
+  },
+
+  // Preferred: built-in gutter utility button (+)
+  // No render callback needed; callback receives current hovered line context.
+  // Callback does not control visibility; options.enableGutterUtility does.
+  // If omitted, button clicks bubble to gutter selection interactions.
+  // With enableLineSelection, omit this handler when you want range-based
+  // annotation workflows (use line selection callbacks instead).
+  // Provide this only when button clicks should do something different than
+  // selection. This handler is click-only (no drag/select behavior).
+  onGutterUtilityClick({ lineNumber }) {
+    console.log(\`Clicked line \${lineNumber}\`);
   },
 }`,
   },
@@ -618,15 +676,32 @@ interface CommentMetadata {
   )}
 
   // ─────────────────────────────────────────────────────────────
-  // HOVER UTILITY
+  // GUTTER UTILITY
   // ─────────────────────────────────────────────────────────────
 
-  // Render UI in the line number column on hover.
-  // Requires options.enableHoverUtility = true
+  // Preferred: built-in + button (no custom render function).
+  // Callback receives the same hovered line payload shape.
+  // Visibility is still controlled by options.enableGutterUtility.
+  // If omitted, button clicks bubble to gutter interactions.
+  // With enableLineSelection, omit this handler for range workflows and use
+  // line selection callbacks instead.
+  // Provide this only when clicks should do something different than selection.
+  // This handler is click-only (no drag/select behavior).
+  onGutterUtilityClick={({ lineNumber }) => {
+    console.log(\`Clicked line \${lineNumber}\`);
+  }}
+
+  // Advanced: render your own UI in the line number column on hover.
+  // Prefer onGutterUtilityClick unless you need fully custom content.
+  // Requires options.enableGutterUtility = true
+  // Do not combine with onGutterUtilityClick.
+  // WebKit/Safari note: there is a specific scroll-jump issue is tied to
+  // diff views using custom renderGutterUtility + hunkSeparators: 'line-info'.
+  // File views do not use hunk separators, so this case does not apply here.
   //
   // Note: This is NOT reactive - render is not called on every
   // mouse move. Use getHoveredLine() in click handlers.
-  renderHoverUtility={(getHoveredLine) => (
+  renderGutterUtility={(getHoveredLine) => (
     <button
       onClick={() => {
         const { lineNumber } = getHoveredLine();

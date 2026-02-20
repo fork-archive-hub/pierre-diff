@@ -155,8 +155,8 @@ function renderDiff(parsedPatches: ParsedPatch[], manager?: WorkerPoolManager) {
         // expandUnchanged: true,
 
         // Hover Decoration Snippets
-        // enableHoverUtility: true,
-        // renderHoverUtility(getHoveredLine) {
+        enableGutterUtility: true,
+        // renderGutterUtility(getHoveredLine) {
         //   const el = document.createElement('div');
         //   el.style.width = '20px';
         //   el.style.height = '20px';
@@ -174,6 +174,9 @@ function renderDiff(parsedPatches: ParsedPatch[], manager?: WorkerPoolManager) {
         //     event.stopPropagation();
         //   });
         //   return el;
+        // },
+        // onGutterUtilityClick(event) {
+        //   console.log('ZZZZ - clicked', event);
         // },
 
         // Custom Hunk Separators Tests with expansion properties
@@ -571,8 +574,8 @@ if (renderFileButton != null) {
       enableLineSelection: true,
 
       // Hover Decoration Snippets
-      // enableHoverUtility: true,
-      // renderHoverUtility(getHoveredLine) {
+      enableGutterUtility: true,
+      // renderGutterUtility(getHoveredLine) {
       //   const el = document.createElement('div');
       //   el.style.width = '20px';
       //   el.style.height = '20px';
@@ -590,6 +593,9 @@ if (renderFileButton != null) {
       //     event.stopPropagation();
       //   });
       //   return el;
+      // },
+      // onGutterUtilityClick(event) {
+      //   console.log('ZZZZ - clicked', event);
       // },
     };
 

@@ -143,6 +143,13 @@ const instance = new FileDiff({
 
   // What to show between diff hunks:
   // 'line-info' (default) - shows collapsed line count, clickable to expand
+  // WebKit/Safari bug in version 26 as of this writing: if you use
+  // 'renderGutterUtility' with hunkSeparators: 'line-info', you may see
+  // scroll jumping while moving the mouse.
+  // Recommended: use the built-in gutter utility button by not using this API,
+  // or switch to another hunk separator type (for example 'line-info-basic').
+  // For a status of this bug, visit:
+  // https://bugs.webkit.org/show_bug.cgi?id=308027
   // 'line-info-basic' - slightly more compact full width line-info variant
   // 'metadata' - shows patch format like '@@ -60,6 +60,22 @@'
   // 'simple' - subtle bar separator
@@ -225,8 +232,11 @@ const instance = new FileDiff({
   // 'line' - highlights only the line content
   lineHoverHighlight: 'disabled',
 
-  // Must be true to enable renderHoverUtility
-  enableHoverUtility: false,
+  // Must be true to enable renderGutterUtility
+  enableGutterUtility: false,
+  // Deprecated alias: enableHoverUtility
+  // This boolean controls visibility for both built-in and 
+  // custom gutter utility UI.
 
   // Fires when clicking anywhere on a line
   onLineClick({ lineNumber, side, event }) {},
@@ -239,6 +249,18 @@ const instance = new FileDiff({
 
   // Fires when mouse leaves a line
   onLineLeave({ lineNumber, side }) {},
+
+  // Preferred: built-in gutter utility button (+)
+  // No render callback needed; callback receives current hovered line context.
+  // Callback does not control visibility; enableGutterUtility does.
+  // If omitted, button clicks bubble to gutter selection interactions.
+  // With enableLineSelection, omit this handler when you want range-based
+  // annotation workflows (use line selection callbacks instead).
+  // Provide this only when button clicks should do something different than
+  // selection. This handler is click-only (no drag/select behavior).
+  onGutterUtilityClick({ lineNumber, side }) {
+    console.log('Clicked line', lineNumber, 'on', side);
+  },
 
   // ─────────────────────────────────────────────────────────────
   // RENDER CALLBACKS
@@ -258,9 +280,17 @@ const instance = new FileDiff({
     return element;
   },
 
-  // Render UI in the line number column on hover
-  // Requires enableHoverUtility: true
-  renderHoverUtility(getHoveredLine) {
+  // Advanced: render your own custom gutter utility UI on hover.
+  // Prefer onGutterUtilityClick unless you need fully custom content.
+  // Requires enableGutterUtility: true
+  // Do not combine with onGutterUtilityClick.
+  // WebKit/Safari bug in version 26 as of this writing: if you use this custom
+  // API with hunkSeparators: 'line-info', you may see scroll jumping while
+  // moving the mouse.
+  // Recommended: use the built-in gutter utility API, or switch hunk
+  // separators to 'line-info-basic', 'metadata', or 'simple'. See:
+  // https://bugs.webkit.org/show_bug.cgi?id=308027
+  renderGutterUtility(getHoveredLine) {
     const button = document.createElement('button');
     button.textContent = '+';
     button.addEventListener('click', () => {
@@ -398,8 +428,11 @@ const instance = new File({
   // 'line' - highlights only the line content
   lineHoverHighlight: 'disabled',
 
-  // Must be true to enable renderHoverUtility
-  enableHoverUtility: false,
+  // Must be true to enable renderGutterUtility
+  enableGutterUtility: false,
+  // Deprecated alias: enableHoverUtility
+  // This boolean controls visibility for both built-in and 
+  // custom gutter utility UI.
 
   // Fires when clicking anywhere on a line
   onLineClick({ lineNumber, event }) {},
@@ -412,6 +445,18 @@ const instance = new File({
 
   // Fires when mouse leaves a line
   onLineLeave({ lineNumber }) {},
+
+  // Preferred: built-in gutter utility button (+)
+  // No render callback needed; callback receives current hovered line context.
+  // Callback does not control visibility; enableGutterUtility does.
+  // If omitted, button clicks bubble to gutter selection interactions.
+  // With enableLineSelection, omit this handler when you want range-based
+  // annotation workflows (use line selection callbacks instead).
+  // Provide this only when button clicks should do something different than
+  // selection. This handler is click-only (no drag/select behavior).
+  onGutterUtilityClick({ lineNumber }) {
+    console.log('Clicked line', lineNumber);
+  },
 
   // ─────────────────────────────────────────────────────────────
   // RENDER CALLBACKS
@@ -432,9 +477,15 @@ const instance = new File({
     return element;
   },
 
-  // Render UI in the line number column on hover
-  // Requires enableHoverUtility: true
-  renderHoverUtility(getHoveredLine) {
+  // Advanced: render your own custom gutter utility UI on hover.
+  // Prefer onGutterUtilityClick unless you need fully custom content.
+  // Requires enableGutterUtility: true
+  // Do not combine with onGutterUtilityClick.
+  // WebKit/Safari note: there is a specific scroll-jump issue is tied to 
+  // diff views using custom renderGutterUtility + hunkSeparators:
+  // 'line-info'. File views do not use hunk separators, so this case
+  // does not apply here but you should be aware of it.
+  renderGutterUtility(getHoveredLine) {
     const button = document.createElement('button');
     button.textContent = '+';
     button.addEventListener('click', () => {
