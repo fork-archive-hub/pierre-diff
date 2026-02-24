@@ -22,6 +22,7 @@ interface UseFileTreeInstanceProps {
   // Default (uncontrolled) state
   initialExpandedItems?: string[];
   initialSelectedItems?: string[];
+  initialSearchQuery?: string | null;
 
   // Controlled state
   expandedItems?: string[];
@@ -45,6 +46,7 @@ export function useFileTreeInstance({
   onFilesChange,
   initialExpandedItems,
   initialSelectedItems,
+  initialSearchQuery,
   expandedItems,
   selectedItems,
   onExpandedItemsChange,
@@ -75,6 +77,7 @@ export function useFileTreeInstance({
     initialExpandedItems,
     initialSelectedItems,
     gitStatus,
+    initialSearchQuery,
   });
   statePropsRef.current = {
     files,
@@ -88,6 +91,7 @@ export function useFileTreeInstance({
     initialExpandedItems,
     initialSelectedItems,
     gitStatus,
+    initialSearchQuery,
   };
 
   // Ref callback that handles mount/unmount and re-runs when options change.
@@ -135,13 +139,18 @@ export function useFileTreeInstance({
 
       const createInstance = (existingId?: string): FileTree => {
         const sp = statePropsRef.current;
+        const optionsWithFiles = options as FileTreeOptions;
         syncedGitStatusSignatureRef.current = getGitStatusSignature(
           sp.gitStatus
         );
         return new FileTree(
           {
             ...options,
-            initialFiles: sp.initialFiles ?? sp.files ?? [],
+            initialFiles:
+              sp.initialFiles ??
+              sp.files ??
+              optionsWithFiles.initialFiles ??
+              [],
             id: existingId,
             ...(sp.gitStatus != null && { gitStatus: sp.gitStatus }),
           },
@@ -153,6 +162,7 @@ export function useFileTreeInstance({
             // setExpandedItems/setSelectedItems imperatively.
             initialExpandedItems: sp.initialExpandedItems ?? sp.expandedItems,
             initialSelectedItems: sp.initialSelectedItems ?? sp.selectedItems,
+            initialSearchQuery: sp.initialSearchQuery,
             onExpandedItemsChange: sp.onExpandedItemsChange,
             onSelectedItemsChange: sp.onSelectedItemsChange,
             onSelection: sp.onSelection,

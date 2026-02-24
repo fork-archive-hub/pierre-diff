@@ -5,6 +5,7 @@ import {
   IconCiWarningFill,
   IconInfoFill,
 } from '@pierre/icons';
+import { FileTree } from '@pierre/trees/react';
 import { compileMDX } from 'next-mdx-remote/rsc';
 import Link from 'next/link';
 import { readFile } from 'node:fs/promises';
@@ -25,6 +26,7 @@ import {
   VanillaComponentTabs,
   VanillaPropTabs,
 } from '../app/docs/VanillaAPI/ComponentTabs';
+import { TreesCodeToggle } from '../app/trees/docs/Overview/TreesCodeToggle';
 import rehypeHierarchicalSlug from './rehype-hierarchical-slug';
 import remarkTocIgnore from './remark-toc-ignore';
 import { Button } from '@/components/ui/button';
@@ -55,10 +57,12 @@ const defaultComponents = {
   IconInfoFill,
   IconBulbFill,
   DocsCodeExample,
+  FileTree,
   MultiFileDiff,
   // Interactive tab components
   PackageManagerTabs,
   CodeToggle,
+  TreesCodeToggle,
   ComponentTabs,
   SharedPropTabs,
   AcceptRejectTabs,

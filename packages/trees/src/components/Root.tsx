@@ -10,7 +10,13 @@ import {
 } from '@headless-tree/core';
 import { Fragment } from 'preact';
 import type { JSX } from 'preact';
-import { useCallback, useEffect, useMemo, useRef } from 'preact/hooks';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'preact/hooks';
 
 import { FLATTENED_PREFIX } from '../constants';
 import {
@@ -59,26 +65,47 @@ const getFilesSignature = (files: string[]): string =>
 
 function FlattenedDirectoryName({
   tree,
+  idToPath,
   flattens,
+  fallbackName,
 }: {
   tree: TreeInstance<FileTreeNode>;
+  idToPath: Map<string, string>;
   flattens: string[];
+  fallbackName: string;
 }): JSX.Element {
   'use no memo';
-  const flattenedItems = useMemo(() => {
-    return flattens.map((name) => tree.getItemInstance(name));
-  }, [flattens, tree]);
+  const segments = useMemo(() => {
+    const result: { id: string; label: string }[] = [];
+    for (const id of flattens) {
+      const item = tree.getItemInstance(id);
+      if (item != null) {
+        result.push({ id: item.getId(), label: item.getItemName() });
+      } else {
+        const path = idToPath.get(id);
+        const label = path != null ? (path.split('/').pop() ?? id) : id;
+        result.push({ id, label });
+      }
+    }
+    return result;
+  }, [flattens, tree, idToPath]);
+
+  if (segments.length === 0) {
+    return (
+      <span data-item-flattened-subitems>
+        {fallbackName.replace(/\//g, ' / ')}
+      </span>
+    );
+  }
+
   return (
     <span data-item-flattened-subitems>
-      {flattenedItems.map((item, index) => {
-        const isLast = index === flattenedItems.length - 1;
-
+      {segments.map(({ id, label }, index) => {
+        const isLast = index === segments.length - 1;
         return (
-          <Fragment key={index}>
-            <span data-item-flattened-subitem={item.getId()}>
-              {item.getItemName()}
-            </span>
-            {!isLast ? '/' : ''}
+          <Fragment key={id}>
+            <span data-item-flattened-subitem={id}>{label}</span>
+            {!isLast ? ' / ' : ''}
           </Fragment>
         );
       })}
@@ -98,6 +125,7 @@ export function Root({
     flattenEmptyDirectories,
     fileTreeSearchMode,
     gitStatus,
+    lockedPaths,
     onCollision,
     useLazyDataLoader,
   } = fileTreeOptions;
@@ -236,9 +264,10 @@ export function Root({
       return ids.length > 0 ? ids : [];
     };
 
-    // Merge top-level initialExpandedItems/initialSelectedItems into config.initialState
+    // Merge top-level initialExpandedItems/initialSelectedItems/initialSearchQuery into config.initialState
     const topLevelInitialExpanded = stateConfig?.initialExpandedItems;
     const topLevelInitialSelected = stateConfig?.initialSelectedItems;
+    const topLevelInitialSearch = stateConfig?.initialSearchQuery;
     const topLevelInitialExpandedIds =
       topLevelInitialExpanded != null
         ? expandPathsWithAncestors(topLevelInitialExpanded, pathToId, {
@@ -247,7 +276,9 @@ export function Root({
         : undefined;
     const topLevelInitialSelectedIds = mapPathsToIds(topLevelInitialSelected);
     const hasTopLevelInitial =
-      topLevelInitialExpanded != null || topLevelInitialSelected != null;
+      topLevelInitialExpanded != null ||
+      topLevelInitialSelected != null ||
+      topLevelInitialSearch != null;
 
     const mergedInitialState = hasTopLevelInitial
       ? {
@@ -257,6 +288,9 @@ export function Root({
           }),
           ...(topLevelInitialSelectedIds != null && {
             selectedItems: topLevelInitialSelectedIds,
+          }),
+          ...(topLevelInitialSearch != null && {
+            search: topLevelInitialSearch,
           }),
         }
       : (baseConfig.initialState as TreeStateConfig | undefined);
@@ -477,7 +511,17 @@ export function Root({
     features,
     ...(isDnD && {
       canReorder: false,
-      canDrag: () => !searchActiveRef.current,
+      canDrag: (items: ItemInstance<FileTreeNode>[]) => {
+        if (searchActiveRef.current) return false;
+        if (lockedPaths == null || lockedPaths.length === 0) return true;
+        const lockedSet = new Set(lockedPaths);
+        for (const item of items) {
+          const path = item.getItemData().path;
+          if (path != null && lockedSet.has(getSelectionPath(path)))
+            return false;
+        }
+        return true;
+      },
       onDrop: onDropHandler,
       canDrop: (
         _items: ItemInstance<FileTreeNode>[],
@@ -662,6 +706,15 @@ export function Root({
     onSelectedItemsChange(paths);
   }, [selectedSnapshot, callbacksRef, tree, idToPath]);
 
+  // When tree mounts with initial search in state, run setSearch once so expand/collapse filter is applied.
+  // useLayoutEffect ensures this runs before paint so the first frame shows the correct expansion.
+  useLayoutEffect(() => {
+    const search = tree.getState().search;
+    if (search != null && search.length > 0) {
+      tree.setSearch(search);
+    }
+  }, [tree]);
+
   const { onChange, ...origSearchInputProps } =
     tree.getSearchInputElementProps();
   const hasFocusedItem = tree.getState().focusedItem != null;
@@ -696,6 +749,10 @@ export function Root({
           visibleIdSet != null
             ? allItems.filter((item) => visibleIdSet.has(item.getId()))
             : allItems;
+        const lockedPathSet =
+          lockedPaths != null && lockedPaths.length > 0
+            ? new Set(lockedPaths)
+            : null;
         return items.map((item) => {
           const itemData = item.getItemData();
           const itemMeta = item.getItemMeta();
@@ -706,6 +763,10 @@ export function Root({
           const startWithCapital =
             itemName.charAt(0).toUpperCase() === itemName.charAt(0);
           const alignCapitals = startWithCapital;
+          const itemPath = itemData?.path;
+          const isLocked =
+            itemPath != null &&
+            lockedPathSet?.has(getSelectionPath(itemPath)) === true;
           const isSelected = item.isSelected();
           const selectionProps = isSelected
             ? { 'data-item-selected': true }
@@ -824,7 +885,9 @@ export function Root({
                 {isFlattenedDirectory ? (
                   <FlattenedDirectoryName
                     tree={tree}
+                    idToPath={idToPath}
                     flattens={itemData?.flattens ?? []}
+                    fallbackName={itemName}
                   />
                 ) : (
                   itemName
@@ -836,6 +899,11 @@ export function Root({
                   {statusLabel ?? (
                     <Icon name="file-tree-icon-dot" width={6} height={6} />
                   )}
+                </div>
+              ) : null}
+              {isLocked ? (
+                <div data-item-section="lock" style={{ marginLeft: 'auto' }}>
+                  <Icon name="file-tree-icon-lock" />
                 </div>
               ) : null}
             </button>

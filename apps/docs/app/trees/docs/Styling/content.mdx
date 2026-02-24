@@ -1,0 +1,30 @@
+## Styling
+
+The file tree is rendered inside a shadow DOM host (the `file-tree-container`
+custom element), so its styles are isolated from your page.
+
+Customize it by passing **class and style** on the host: use `className` and
+`style` on the React `FileTree` component, or set them on the host element after
+`render()` in vanilla JS. That lets you control layout (e.g. `maxHeight`,
+`width`) and override the tree’s CSS variables (e.g. `--ft-font-size`,
+`--ft-row-height`) in global CSS, on a wrapper, or via the `style` prop.
+
+For the full list of CSS variables, review `style.css` in the `@pierre/trees`
+package.
+
+<DocsCodeExample {...stylingGlobal} />
+<DocsCodeExample {...stylingInline} />
+
+### Git status styling hooks
+
+When `gitStatus` is provided, tree rows include status-aware attributes you can
+target:
+
+- `data-item-git-status="added" | "modified" | "deleted"` on changed files
+- `data-item-contains-git-change="true"` on folders that contain changed files
+
+You can also override these CSS variables:
+
+- `--ft-git-added-color`
+- `--ft-git-modified-color`
+- `--ft-git-deleted-color`

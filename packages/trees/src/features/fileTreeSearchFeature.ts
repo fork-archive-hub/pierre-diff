@@ -133,6 +133,15 @@ const addAncestorFolders = (
   }
 };
 
+/** All folder IDs from the search index (items that have children). */
+const getAllFolderIds = <T>(
+  tree: TreeInstance<T>,
+  index: SearchIndex
+): string[] =>
+  index.orderedIds.filter(
+    (id) => (tree.retrieveChildrenIds(id) ?? []).length > 0
+  );
+
 const expandForMatches = <T>(
   tree: TreeInstance<T>,
   cache: SearchCache<T>,
@@ -231,10 +240,19 @@ export const fileTreeSearchFeature: FeatureImplementation = {
 
       const cache = getSearchCache(tree);
       const searchMode = getSearchMode(tree);
+      // When mount has initialSearchQuery, we re-apply the same search in an effect.
+      // expand-matches: keep all folders expanded (baseline = all folder ids) so "all items visible".
+      // collapse-non-matches: baseline stays [] so only ancestors of matches are expanded.
+      const isInitialApply =
+        searchMode === 'expand-matches' &&
+        dataRef.current.previousExpandedItems == null &&
+        previousSearch === search;
       const baselineExpandedItems =
         searchMode === 'expand-matches'
-          ? (dataRef.current.previousExpandedItems ??
-            tree.getState().expandedItems)
+          ? isInitialApply
+            ? getAllFolderIds(tree, cache.index)
+            : (dataRef.current.previousExpandedItems ??
+              tree.getState().expandedItems)
           : [];
       expandForMatches(
         tree,
