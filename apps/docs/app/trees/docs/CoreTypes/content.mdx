@@ -44,6 +44,7 @@ folder containing `index.ts`, `utils/helpers.ts`, and a `components` folder with
 | `lockedPaths`             | Optional list of file/folder paths that cannot be dragged when drag and drop is enabled.                                                                                                            |
 | `onCollision`             | Optional callback for drag collisions. Return `true` to overwrite destination.                                                                                                                      |
 | `gitStatus`               | Optional `GitStatusEntry[]` used to show Git-style file status (`added`, `modified`, `deleted`). Folders with changed descendants also receive a change indicator. [Live demo](/trees#path-colors). |
+| `icons`                   | Optional `FileTreeIconConfig` to provide a custom SVG sprite sheet and remap built-in icon names to your own symbols. [Live demo](/trees#custom-icons).                                             |
 
 `onSelection` is configured in React as a top-level prop
 (`\<FileTree onSelection={...} />`) and in vanilla via `FileTreeStateConfig`
@@ -62,16 +63,6 @@ React top-level props). Each item has a `path` (the file or folder path) and
 
 <DocsCodeExample {...fileTreeSelectionItemType} />
 
-### GitStatus & GitStatusEntry
-
-`GitStatusEntry` pairs a file `path` with a status value
-(`'added' | 'modified' | 'deleted'`):
-`{ path: string; status: 'added' | 'modified' | 'deleted' }`.
-
-Import `GitStatusEntry` from `@pierre/trees` and use it with `gitStatus` in
-FileTree options/props to show Git-style status indicators on files. `path`
-should match your tree file paths (for example, `src/index.ts`).
-
 ### FileTreeSearchMode
 
 `FileTreeSearchMode` controls how search affects the tree. Pass it via
@@ -83,13 +74,3 @@ should match your tree file paths (for example, `src/index.ts`).
 - `'hide-non-matches'`: keep branch structure but hide non-matching rows.
 
 <DocsCodeExample {...fileTreeSearchModeType} />
-
-### FileTreeStateConfig
-
-`FileTreeStateConfig` is the state/callback config for the vanilla `FileTree`
-constructor's second argument. Use it for defaults (`initialExpandedItems`,
-`initialSelectedItems`, `initialSearchQuery`) and callbacks/controlled values
-(`onSelection`, `onExpandedItemsChange`, `onSelectedItemsChange`,
-`onFilesChange`, plus `expandedItems`/`selectedItems`/`files` when controlled).
-
-<DocsCodeExample {...fileTreeStateConfigType} />

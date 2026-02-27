@@ -41,15 +41,12 @@ tree state programmatically:
 | `setCallbacks(callbacks)`           | Update callbacks (`onSelection`, etc.) after construction |
 | `setOptions(options, stateConfig?)` | Merge new options (and optionally state config)           |
 
-### With `gitStatus`
+### FileTreeStateConfig
 
-For VCS integrations, pass `gitStatus` in constructor options and update it
-imperatively as changes arrive:
+`FileTreeStateConfig` is the state/callback config for the `FileTree`
+constructor's second argument. Use it for defaults (`initialExpandedItems`,
+`initialSelectedItems`, `initialSearchQuery`) and callbacks/controlled values
+(`onSelection`, `onExpandedItemsChange`, `onSelectedItemsChange`,
+`onFilesChange`, plus `expandedItems`/`selectedItems`/`files` when controlled).
 
-- `fileTree.setGitStatus(entries | undefined)` updates the current git statuses
-  and re-renders.
-- `fileTree.getGitStatus()` returns the current `GitStatusEntry[] | undefined`.
-
-Try the live behavior at [/trees#path-colors](/trees#path-colors).
-
-<DocsCodeExample {...vanillaAPIGitStatusExample} />
+<DocsCodeExample {...fileTreeStateConfigType} />

@@ -23,6 +23,7 @@ import {
   TREES_VANILLA_BASIC_USAGE,
 } from './Overview/constants';
 import {
+  REACT_API_CUSTOM_ICONS_EXAMPLE,
   REACT_API_FILE_TREE,
   REACT_API_FILE_TREE_PROPS,
   REACT_API_GIT_STATUS_EXAMPLE,
@@ -35,6 +36,7 @@ import {
   HELPER_SORT_CHILDREN,
 } from './Utilities/constants';
 import {
+  VANILLA_API_CUSTOM_ICONS_EXAMPLE,
   VANILLA_API_FILE_TREE_EXAMPLE,
   VANILLA_API_FILE_TREE_OPTIONS,
   VANILLA_API_GIT_STATUS_EXAMPLE,
@@ -59,6 +61,8 @@ export default function TreesDocsPage() {
           <CoreTypesSection />
           <ReactAPISection />
           <VanillaAPISection />
+          <GitStatusSection />
+          <CustomIconsSection />
           <UtilitiesSection />
           <StylingSection />
           <SSRSection />
@@ -106,14 +110,12 @@ async function CoreTypesSection() {
     fileTreeOptionsType,
     fileTreeSelectionItemType,
     fileTreeSearchModeType,
-    fileTreeStateConfigType,
     filesOptionExample,
     onSelectionExample,
   ] = await Promise.all([
     preloadFile(FILE_TREE_OPTIONS_TYPE),
     preloadFile(FILE_TREE_SELECTION_ITEM_TYPE),
     preloadFile(FILE_TREE_SEARCH_MODE_TYPE),
-    preloadFile(FILE_TREE_STATE_CONFIG_TYPE),
     preloadFile(FILES_OPTION_EXAMPLE),
     preloadFile(ON_SELECTION_EXAMPLE),
   ]);
@@ -123,7 +125,6 @@ async function CoreTypesSection() {
       fileTreeOptionsType,
       fileTreeSelectionItemType,
       fileTreeSearchModeType,
-      fileTreeStateConfigType,
       filesOptionExample,
       onSelectionExample,
     },
@@ -132,18 +133,15 @@ async function CoreTypesSection() {
 }
 
 async function ReactAPISection() {
-  const [reactAPIFileTree, reactAPIFileTreeProps, reactAPIGitStatusExample] =
-    await Promise.all([
-      preloadFile(REACT_API_FILE_TREE),
-      preloadFile(REACT_API_FILE_TREE_PROPS),
-      preloadFile(REACT_API_GIT_STATUS_EXAMPLE),
-    ]);
+  const [reactAPIFileTree, reactAPIFileTreeProps] = await Promise.all([
+    preloadFile(REACT_API_FILE_TREE),
+    preloadFile(REACT_API_FILE_TREE_PROPS),
+  ]);
   const content = await renderMDX({
     filePath: 'trees/docs/ReactAPI/content.mdx',
     scope: {
       reactAPIFileTree,
       reactAPIFileTreeProps,
-      reactAPIGitStatusExample,
     },
   });
   return <ProseWrapper>{content}</ProseWrapper>;
@@ -153,19 +151,43 @@ async function VanillaAPISection() {
   const [
     vanillaAPIFileTreeExample,
     vanillaAPIFileTreeOptions,
-    vanillaAPIGitStatusExample,
+    fileTreeStateConfigType,
   ] = await Promise.all([
     preloadFile(VANILLA_API_FILE_TREE_EXAMPLE),
     preloadFile(VANILLA_API_FILE_TREE_OPTIONS),
-    preloadFile(VANILLA_API_GIT_STATUS_EXAMPLE),
+    preloadFile(FILE_TREE_STATE_CONFIG_TYPE),
   ]);
   const content = await renderMDX({
     filePath: 'trees/docs/VanillaAPI/content.mdx',
     scope: {
       vanillaAPIFileTreeExample,
       vanillaAPIFileTreeOptions,
-      vanillaAPIGitStatusExample,
+      fileTreeStateConfigType,
     },
+  });
+  return <ProseWrapper>{content}</ProseWrapper>;
+}
+
+async function GitStatusSection() {
+  const [reactGitStatus, vanillaGitStatus] = await Promise.all([
+    preloadFile(REACT_API_GIT_STATUS_EXAMPLE),
+    preloadFile(VANILLA_API_GIT_STATUS_EXAMPLE),
+  ]);
+  const content = await renderMDX({
+    filePath: 'trees/docs/GitStatus/content.mdx',
+    scope: { reactGitStatus, vanillaGitStatus },
+  });
+  return <ProseWrapper>{content}</ProseWrapper>;
+}
+
+async function CustomIconsSection() {
+  const [reactIcons, vanillaIcons] = await Promise.all([
+    preloadFile(REACT_API_CUSTOM_ICONS_EXAMPLE),
+    preloadFile(VANILLA_API_CUSTOM_ICONS_EXAMPLE),
+  ]);
+  const content = await renderMDX({
+    filePath: 'trees/docs/Icons/content.mdx',
+    scope: { reactIcons, vanillaIcons },
   });
   return <ProseWrapper>{content}</ProseWrapper>;
 }
