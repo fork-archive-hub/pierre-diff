@@ -6,6 +6,7 @@ import {
 export * from './components/File';
 export * from './components/FileDiff';
 export * from './components/FileStream';
+export * from './components/UnresolvedFile';
 export * from './components/VirtualizedFile';
 export * from './components/VirtualizedFileDiff';
 export * from './components/Virtualizer';
@@ -94,6 +95,7 @@ export * from './utils/prerenderHTMLIfNecessary';
 export * from './utils/processLine';
 export * from './utils/renderDiffWithHighlighter';
 export * from './utils/renderFileWithHighlighter';
+export * from './utils/resolveMergeConflict';
 export * from './utils/setLanguageOverride';
 export * from './utils/setWrapperNodeProps';
 export * from './utils/trimPatchContext';

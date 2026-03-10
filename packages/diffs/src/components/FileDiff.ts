@@ -26,6 +26,7 @@ import {
 import { SVGSpriteSheet } from '../sprite';
 import type {
   BaseDiffOptions,
+  CustomPreProperties,
   DiffLineAnnotation,
   ExpansionDirections,
   FileContents,
@@ -87,7 +88,7 @@ export interface FileDiffOptions<LAnnotation>
     | ((
         hunk: HunkData,
         instance: FileDiff<LAnnotation>
-      ) => HTMLElement | DocumentFragment);
+      ) => HTMLElement | DocumentFragment | undefined);
   disableFileHeader?: boolean;
   /**
    * @deprecated Use `enableGutterUtility` instead.
@@ -198,17 +199,7 @@ export class FileDiff<LAnnotation = undefined> {
     protected workerManager?: WorkerPoolManager | undefined,
     protected isContainerManaged = false
   ) {
-    this.hunksRenderer = new DiffHunksRenderer(
-      {
-        ...options,
-        hunkSeparators:
-          typeof options.hunkSeparators === 'function'
-            ? 'custom'
-            : options.hunkSeparators,
-      },
-      this.handleHighlightRender,
-      this.workerManager
-    );
+    this.hunksRenderer = this.createHunksRenderer(options);
     this.resizeManager = new ResizeManager();
     this.scrollSyncManager = new ScrollSyncManager();
     this.interactionManager = new InteractionManager(
@@ -227,9 +218,31 @@ export class FileDiff<LAnnotation = undefined> {
     this.enabled = true;
   }
 
-  private handleHighlightRender = (): void => {
+  protected handleHighlightRender = (): void => {
     this.rerender();
   };
+
+  protected getHunksRendererOptions(
+    options: FileDiffOptions<LAnnotation>
+  ): BaseDiffOptions {
+    return {
+      ...options,
+      hunkSeparators:
+        typeof options.hunkSeparators === 'function'
+          ? 'custom'
+          : options.hunkSeparators,
+    };
+  }
+
+  protected createHunksRenderer(
+    options: FileDiffOptions<LAnnotation>
+  ): DiffHunksRenderer<LAnnotation> {
+    return new DiffHunksRenderer(
+      this.getHunksRendererOptions(options),
+      this.handleHighlightRender,
+      this.workerManager
+    );
+  }
 
   public getLineIndex: GetLineIndexUtility = (
     lineNumber: number,
@@ -323,13 +336,7 @@ export class FileDiff<LAnnotation = undefined> {
   public setOptions(options: FileDiffOptions<LAnnotation> | undefined): void {
     if (options == null) return;
     this.options = options;
-    this.hunksRenderer.setOptions({
-      ...this.options,
-      hunkSeparators:
-        typeof options.hunkSeparators === 'function'
-          ? 'custom'
-          : options.hunkSeparators,
-    });
+    this.hunksRenderer.setOptions(this.getHunksRendererOptions(options));
     this.interactionManager.setOptions(
       pluckInteractionOptions(
         options,
@@ -903,7 +910,10 @@ export class FileDiff<LAnnotation = undefined> {
         const element = document.createElement('div');
         element.style.display = 'contents';
         element.slot = hunk.slotName;
-        element.appendChild(hunkSeparators(hunk, this));
+        const child = hunkSeparators(hunk, this);
+        if (child != null) {
+          element.appendChild(child);
+        }
         this.fileContainer.appendChild(element);
         cache = { element, hunkData: hunk };
         this.separatorCache.set(id, cache);
@@ -1857,7 +1867,7 @@ export class FileDiff<LAnnotation = undefined> {
     }
   }
 
-  private applyPreNodeAttributes(
+  protected applyPreNodeAttributes(
     pre: HTMLPreElement,
     {
       themeStyles,
@@ -1865,7 +1875,8 @@ export class FileDiff<LAnnotation = undefined> {
       additionsContentAST,
       deletionsContentAST,
       totalLines,
-    }: HunksRenderResult
+    }: HunksRenderResult,
+    customProperties?: CustomPreProperties
   ): void {
     const {
       diffIndicators = 'bars',
@@ -1888,6 +1899,7 @@ export class FileDiff<LAnnotation = undefined> {
       themeStyles,
       themeType: baseThemeType ?? themeType,
       totalLines,
+      customProperties,
     };
     if (arePrePropertiesEqual(preProperties, this.appliedPreAttributes)) {
       return;

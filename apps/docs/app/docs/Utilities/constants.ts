@@ -420,3 +420,43 @@ export function AcceptRejectExample() {
   },
   options,
 };
+
+export const HELPER_RESOLVE_MERGE_CONFLICT: PreloadFileOptions<undefined> = {
+  file: {
+    name: 'resolveMergeConflict.ts',
+    contents: `import {
+  UnresolvedFile,
+  type FileContents,
+  resolveMergeConflict,
+  type MergeConflictActionPayload,
+} from '@pierre/diffs';
+
+const container = document.getElementById('diff-container');
+
+let currentFile: FileContents = {
+  name: 'App.tsx',
+  contents: \`export function handler() {
+<<<<<<< HEAD
+  return 'current';
+=======
+  return 'incoming';
+>>>>>>> feature/new-handler
+}\`,
+};
+
+const instance = new UnresolvedFile({
+  // Controlled mode: apply payloads yourself.
+  onMergeConflictAction(payload: MergeConflictActionPayload) {
+    currentFile = {
+      ...currentFile,
+      contents: resolveMergeConflict(currentFile.contents, payload),
+    };
+
+    instance.render({ file: currentFile, containerWrapper: container });
+  },
+});
+
+instance.render({ file: currentFile, containerWrapper: container });`,
+  },
+  options,
+};

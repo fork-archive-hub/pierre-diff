@@ -1,6 +1,12 @@
 import '@/app/prose.css';
-import { preloadFile, preloadMultiFileDiff } from '@pierre/diffs/ssr';
+import {
+  preloadFile,
+  preloadMultiFileDiff,
+  preloadUnresolvedFile,
+} from '@pierre/diffs/ssr';
 
+import { MERGE_CONFLICT_EXAMPLE } from '../diff-examples/MergeConflict/constants';
+import { MergeConflict } from '../diff-examples/MergeConflict/MergeConflict';
 import {
   FILE_CONTENTS_TYPE,
   FILE_DIFF_METADATA_TYPE,
@@ -34,6 +40,7 @@ import {
   REACT_API_SHARED_DIFF_RENDER_PROPS,
   REACT_API_SHARED_FILE_OPTIONS,
   REACT_API_SHARED_FILE_RENDER_PROPS,
+  REACT_API_UNRESOLVED_FILE,
 } from './ReactAPI/constants';
 import {
   SSR_PRELOAD_FILE,
@@ -41,6 +48,7 @@ import {
   SSR_PRELOAD_MULTI_FILE_DIFF,
   SSR_PRELOAD_PATCH_DIFF,
   SSR_PRELOAD_PATCH_FILE,
+  SSR_PRELOAD_UNRESOLVED_FILE,
   SSR_USAGE_CLIENT,
   SSR_USAGE_SERVER,
 } from './SSR/constants';
@@ -59,6 +67,7 @@ import {
   HELPER_PRELOAD_HIGHLIGHTER,
   HELPER_REGISTER_CUSTOM_LANGUAGE,
   HELPER_REGISTER_CUSTOM_THEME,
+  HELPER_RESOLVE_MERGE_CONFLICT,
   HELPER_SET_LANGUAGE_OVERRIDE,
   HELPER_TRIM_PATCH_CONTEXT,
 } from './Utilities/constants';
@@ -71,6 +80,7 @@ import {
   VANILLA_API_FILE_RENDERER,
   VANILLA_API_HUNKS_RENDERER_FILE,
   VANILLA_API_HUNKS_RENDERER_PATCH_FILE,
+  VANILLA_API_UNRESOLVED_FILE_EXAMPLE,
 } from './VanillaAPI/constants';
 import {
   VIRTUALIZATION_REACT_BASIC,
@@ -107,6 +117,7 @@ export default function DocsPage() {
         <div className="min-w-0 space-y-8">
           <HeadingAnchors />
           <OverviewSection />
+          <MergeConflictDemoSection />
           <InstallationSection />
           <CoreTypesSection />
           <ReactAPISection />
@@ -122,6 +133,14 @@ export default function DocsPage() {
       </DocsLayout>
       <Footer />
     </div>
+  );
+}
+
+async function MergeConflictDemoSection() {
+  return (
+    <MergeConflict
+      prerenderedFile={await preloadUnresolvedFile(MERGE_CONFLICT_EXAMPLE)}
+    />
   );
 }
 
@@ -198,6 +217,7 @@ async function ReactAPISection() {
     reactAPIFile,
     reactAPIPatch,
     reactAPIFileDiff,
+    reactAPIUnresolvedFile,
     sharedDiffOptions,
     sharedDiffRenderProps,
     sharedFileOptions,
@@ -207,6 +227,7 @@ async function ReactAPISection() {
     preloadFile(REACT_API_FILE),
     preloadFile(REACT_API_PATCH_DIFF),
     preloadFile(REACT_API_FILE_DIFF),
+    preloadFile(REACT_API_UNRESOLVED_FILE),
     preloadFile(REACT_API_SHARED_DIFF_OPTIONS),
     preloadFile(REACT_API_SHARED_DIFF_RENDER_PROPS),
     preloadFile(REACT_API_SHARED_FILE_OPTIONS),
@@ -219,6 +240,7 @@ async function ReactAPISection() {
       reactAPIPatch,
       reactAPIFileDiff,
       reactAPIFile,
+      reactAPIUnresolvedFile,
       sharedDiffOptions,
       sharedDiffRenderProps,
       sharedFileOptions,
@@ -234,6 +256,7 @@ async function VanillaAPISection() {
     fileExample,
     fileDiffProps,
     fileProps,
+    unresolvedFileExample,
     customHunk,
     diffHunksRenderer,
     diffHunksRendererPatch,
@@ -243,6 +266,7 @@ async function VanillaAPISection() {
     preloadFile(VANILLA_API_FILE_EXAMPLE),
     preloadFile(VANILLA_API_FILE_DIFF_PROPS),
     preloadFile(VANILLA_API_FILE_PROPS),
+    preloadFile(VANILLA_API_UNRESOLVED_FILE_EXAMPLE),
     preloadFile(VANILLA_API_CUSTOM_HUNK_FILE),
     preloadFile(VANILLA_API_HUNKS_RENDERER_FILE),
     preloadFile(VANILLA_API_HUNKS_RENDERER_PATCH_FILE),
@@ -255,6 +279,7 @@ async function VanillaAPISection() {
       fileExample,
       fileDiffProps,
       fileProps,
+      unresolvedFileExample,
       customHunk,
       diffHunksRenderer,
       diffHunksRendererPatch,
@@ -296,6 +321,7 @@ async function UtilitiesSection() {
     preloadHighlighter,
     registerCustomLanguage,
     registerCustomTheme,
+    resolveMergeConflictExample,
     setLanguageOverride,
     trimPatchContext,
   ] = await Promise.all([
@@ -308,6 +334,7 @@ async function UtilitiesSection() {
     preloadFile(HELPER_PRELOAD_HIGHLIGHTER),
     preloadFile(HELPER_REGISTER_CUSTOM_LANGUAGE),
     preloadFile(HELPER_REGISTER_CUSTOM_THEME),
+    preloadFile(HELPER_RESOLVE_MERGE_CONFLICT),
     preloadFile(HELPER_SET_LANGUAGE_OVERRIDE),
     preloadFile(HELPER_TRIM_PATCH_CONTEXT),
   ]);
@@ -323,6 +350,7 @@ async function UtilitiesSection() {
       preloadHighlighter,
       registerCustomLanguage,
       registerCustomTheme,
+      resolveMergeConflictExample,
       setLanguageOverride,
       trimPatchContext,
     },
@@ -378,6 +406,7 @@ async function SSRSection() {
     preloadMultiFileDiff,
     preloadPatchDiff,
     preloadFileResult,
+    preloadUnresolvedFileResult,
     preloadPatchFile,
   ] = await Promise.all([
     preloadFile(SSR_USAGE_SERVER),
@@ -386,6 +415,7 @@ async function SSRSection() {
     preloadFile(SSR_PRELOAD_MULTI_FILE_DIFF),
     preloadFile(SSR_PRELOAD_PATCH_DIFF),
     preloadFile(SSR_PRELOAD_FILE),
+    preloadFile(SSR_PRELOAD_UNRESOLVED_FILE),
     preloadFile(SSR_PRELOAD_PATCH_FILE),
   ]);
   const content = await renderMDX({
@@ -397,6 +427,7 @@ async function SSRSection() {
       preloadMultiFileDiff,
       preloadPatchDiff,
       preloadFileResult,
+      preloadUnresolvedFileResult,
       preloadPatchFile,
     },
   });

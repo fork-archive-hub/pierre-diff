@@ -21,6 +21,25 @@ all line numbers properly adjusted for subsequent hunks.
   diffAcceptRejectReact={diffAcceptRejectReact}
 />
 
+### resolveMergeConflict [toc-ignore]
+
+Apply a merge conflict action payload to a file string and return the next
+contents.
+
+> **Experimental:** `UnresolvedFile`-related merge conflict APIs are currently
+> beta/experimental and may change in future releases.
+
+Default merge-conflict buttons work even without callbacks: `UnresolvedFile`
+applies the resolution internally.
+
+In vanilla, provide `onMergeConflictAction` for controlled state (for example,
+to persist resolved contents, sync external stores, or trigger side effects).
+Use `onMergeConflictResolve` when you want uncontrolled resolution plus a
+notification with the resolved file. React `UnresolvedFile` is intentionally
+uncontrolled.
+
+<DocsCodeExample {...resolveMergeConflictExample} />
+
 ### disposeHighlighter [toc-ignore]
 
 Dispose the shared Shiki highlighter instance to free memory. Useful when

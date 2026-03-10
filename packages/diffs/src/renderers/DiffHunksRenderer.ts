@@ -1,4 +1,4 @@
-import type { ElementContent, Element as HASTElement } from 'hast';
+import type { ElementContent, Element as HASTElement, Properties } from 'hast';
 import { toHtml } from 'hast-util-to-html';
 
 import {
@@ -17,7 +17,9 @@ import type {
   AnnotationLineMap,
   AnnotationSpan,
   BaseDiffOptions,
+  BaseDiffOptionsWithDefaults,
   CodeColumnType,
+  CustomPreProperties,
   DiffLineAnnotation,
   DiffsHighlighter,
   ExpansionDirections,
@@ -36,7 +38,7 @@ import type {
 } from '../types';
 import { areRenderRangesEqual } from '../utils/areRenderRangesEqual';
 import { areThemesEqual } from '../utils/areThemesEqual';
-import { createAnnotationElement } from '../utils/createAnnotationElement';
+import { createAnnotationElement as createDefaultAnnotationElement } from '../utils/createAnnotationElement';
 import { createContentColumn } from '../utils/createContentColumn';
 import { createEmptyRowBuffer } from '../utils/createEmptyRowBuffer';
 import { createFileHeaderElement } from '../utils/createFileHeaderElement';
@@ -70,6 +72,7 @@ interface PushLineWithAnnotation {
   deletionSpan?: AnnotationSpan;
   additionSpan?: AnnotationSpan;
 
+  createAnnotationElement(span: AnnotationSpan): HASTElement;
   context: ProcessContext;
 }
 
@@ -103,9 +106,24 @@ interface ProcessContext {
   incrementRowCount(count?: number): void;
 }
 
-type OptionsWithDefaults = Required<
-  Omit<BaseDiffOptions, 'unsafeCSS' | 'preferredHighlighter'>
->;
+export interface UnifiedLineDecorationProps {
+  type: 'context' | 'context-expanded' | 'change';
+  lineType: LineTypes;
+  additionLineIndex: number | undefined;
+  deletionLineIndex: number | undefined;
+}
+
+export interface SplitLineDecorationProps {
+  side: 'deletions' | 'additions';
+  type: 'context' | 'context-expanded' | 'change';
+  lineIndex: number | undefined;
+}
+
+export interface LineDecoration {
+  gutterLineType: LineTypes;
+  gutterProperties?: Properties;
+  contentProperties?: Properties;
+}
 
 export interface HunksRenderResult {
   unifiedGutterAST: ElementContent[] | undefined;
@@ -247,7 +265,30 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
     }
   }
 
-  private getOptionsWithDefaults(): OptionsWithDefaults {
+  protected getUnifiedLineDecoration({
+    lineType,
+  }: UnifiedLineDecorationProps): LineDecoration {
+    return { gutterLineType: lineType };
+  }
+
+  protected getSplitLineDecoration({
+    side,
+    type,
+  }: SplitLineDecorationProps): LineDecoration {
+    if (type !== 'change') {
+      return { gutterLineType: type };
+    }
+    return {
+      gutterLineType:
+        side === 'deletions' ? 'change-deletion' : 'change-addition',
+    };
+  }
+
+  protected createAnnotationElement(span: AnnotationSpan): HASTElement {
+    return createDefaultAnnotationElement(span);
+  }
+
+  protected getOptionsWithDefaults(): BaseDiffOptionsWithDefaults {
     const {
       diffIndicators = 'bars',
       diffStyle = 'split',
@@ -464,11 +505,12 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
     return this.processDiffResult(diff, renderRange, result);
   }
 
-  private createPreElement(
+  protected createPreElement(
     split: boolean,
     totalLines: number,
     themeStyles: string,
-    baseThemeType: 'light' | 'dark' | undefined
+    baseThemeType: 'light' | 'dark' | undefined,
+    customProperties?: CustomPreProperties
   ): HASTElement {
     const {
       diffIndicators,
@@ -487,6 +529,7 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
       split,
       themeType: baseThemeType ?? themeType,
       totalLines,
+      customProperties,
     });
   }
 
@@ -612,17 +655,18 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
     let pendingSplitSpanSize = 0;
     let pendingSplitMissing: 'additions' | 'deletions' | undefined;
 
-    function pushGutterLineNumber(
+    const pushGutterLineNumber = (
       type: CodeColumnType,
       lineType: LineTypes | 'buffer' | 'separator' | 'annotation',
       lineNumber: number,
-      lineIndex: string
-    ) {
+      lineIndex: string,
+      gutterProperties: Properties | undefined
+    ) => {
       context.pushToGutter(
         type,
-        createGutterItem(lineType, lineNumber, lineIndex)
+        createGutterItem(lineType, lineNumber, lineIndex, gutterProperties)
       );
-    }
+    };
 
     function flushSplitSpan() {
       if (diffStyle === 'unified') {
@@ -705,15 +749,14 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
           diffStyle === 'unified' ? unifiedLineIndex : splitLineIndex;
 
         if (diffStyle === 'unified') {
-          const deletionLineContent =
+          let deletionLineContent =
             deletionLine != null
               ? deletionLines[deletionLine.lineIndex]
               : undefined;
-          const additionLineContent =
+          let additionLineContent =
             additionLine != null
               ? additionLines[additionLine.lineIndex]
               : undefined;
-
           if (deletionLineContent == null && additionLineContent == null) {
             const errorMessage =
               'DiffHunksRenderer.processDiffResult: deletionLine and additionLine are null, something is wrong';
@@ -726,14 +769,34 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
                 ? 'change-addition'
                 : 'change-deletion'
               : type;
+          const lineDecoration = this.getUnifiedLineDecoration({
+            // NOTE: This function gets extended so don't remove
+            // these extra props
+            type,
+            lineType,
+            additionLineIndex: additionLine?.lineIndex,
+            deletionLineIndex: deletionLine?.lineIndex,
+          });
           pushGutterLineNumber(
             'unified',
-            lineType,
+            lineDecoration.gutterLineType,
             additionLine != null
               ? additionLine.lineNumber
               : deletionLine.lineNumber,
-            `${unifiedLineIndex},${splitLineIndex}`
+            `${unifiedLineIndex},${splitLineIndex}`,
+            lineDecoration.gutterProperties
           );
+          if (additionLineContent != null) {
+            additionLineContent = withContentProperties(
+              additionLineContent,
+              lineDecoration.contentProperties
+            );
+          } else if (deletionLineContent != null) {
+            deletionLineContent = withContentProperties(
+              deletionLineContent,
+              lineDecoration.contentProperties
+            );
+          }
           pushLineWithAnnotation({
             diffStyle: 'unified',
             type: type,
@@ -746,17 +809,29 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
               hunkIndex,
               lineIndex
             ),
+            createAnnotationElement: (span) =>
+              this.createAnnotationElement(span),
             context,
           });
         } else {
-          const deletionLineContent =
+          let deletionLineContent =
             deletionLine != null
               ? deletionLines[deletionLine.lineIndex]
               : undefined;
-          const additionLineContent =
+          let additionLineContent =
             additionLine != null
               ? additionLines[additionLine.lineIndex]
               : undefined;
+          const deletionLineDecoration = this.getSplitLineDecoration({
+            side: 'deletions',
+            type,
+            lineIndex: deletionLine?.lineIndex,
+          });
+          const additionLineDecoration = this.getSplitLineDecoration({
+            side: 'additions',
+            type,
+            lineIndex: additionLine?.lineIndex,
+          });
 
           if (deletionLineContent == null && additionLineContent == null) {
             const errorMessage =
@@ -801,20 +876,36 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
           }
 
           if (deletionLine != null) {
+            const deletionLineDecorated = withContentProperties(
+              deletionLineContent,
+              deletionLineDecoration.contentProperties
+            );
             pushGutterLineNumber(
               'deletions',
-              type === 'change' ? 'change-deletion' : type,
+              deletionLineDecoration.gutterLineType,
               deletionLine.lineNumber,
-              `${deletionLine.unifiedLineIndex},${splitLineIndex}`
+              `${deletionLine.unifiedLineIndex},${splitLineIndex}`,
+              deletionLineDecoration.gutterProperties
             );
+            if (deletionLineDecorated != null) {
+              deletionLineContent = deletionLineDecorated;
+            }
           }
           if (additionLine != null) {
+            const additionLineDecorated = withContentProperties(
+              additionLineContent,
+              additionLineDecoration.contentProperties
+            );
             pushGutterLineNumber(
               'additions',
-              type === 'change' ? 'change-addition' : type,
+              additionLineDecoration.gutterLineType,
               additionLine.lineNumber,
-              `${additionLine.unifiedLineIndex},${splitLineIndex}`
+              `${additionLine.unifiedLineIndex},${splitLineIndex}`,
+              additionLineDecoration.gutterProperties
             );
+            if (additionLineDecorated != null) {
+              additionLineContent = additionLineDecorated;
+            }
           }
           pushLineWithAnnotation({
             diffStyle: 'split',
@@ -822,6 +913,8 @@ export class DiffHunksRenderer<LAnnotation = undefined> {
             additionLine: additionLineContent,
             deletionLine: deletionLineContent,
             ...annotationSpans,
+            createAnnotationElement: (span) =>
+              this.createAnnotationElement(span),
             context,
           });
         }
@@ -1174,6 +1267,7 @@ function pushLineWithAnnotation({
   unifiedSpan,
   deletionSpan,
   additionSpan,
+  createAnnotationElement,
   context,
 }: PushLineWithAnnotation) {
   let hasAnnotationRow = false;
@@ -1339,6 +1433,26 @@ function pushSeparator(
       ? { up: !isFirstHunk, down: !isLastHunk, chunked }
       : undefined,
   });
+}
+
+function withContentProperties(
+  lineNode: ElementContent | undefined,
+  contentProperties: Properties | undefined
+): ElementContent | undefined {
+  if (
+    lineNode == null ||
+    lineNode.type !== 'element' ||
+    contentProperties == null
+  ) {
+    return lineNode;
+  }
+  return {
+    ...lineNode,
+    properties: {
+      ...lineNode.properties,
+      ...contentProperties,
+    },
+  };
 }
 
 function calculateTrailingRangeSize(fileDiff: FileDiffMetadata): number {

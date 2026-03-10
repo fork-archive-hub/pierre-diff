@@ -95,8 +95,8 @@ export function useFileDiffInstance<LAnnotation>({
   });
 
   useIsometricEffect(() => {
-    if (instanceRef.current == null) return;
-    const instance = instanceRef.current;
+    const { current: instance } = instanceRef;
+    if (instance == null) return;
     const forceRender = !areOptionsEqual(instance.options, options);
     instance.setOptions(options);
     void instance.render({

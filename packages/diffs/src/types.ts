@@ -378,6 +378,12 @@ export interface BaseDiffOptions extends BaseCodeOptions {
   expansionLineCount?: number; // 100 is default
 }
 
+export type BaseDiffOptionsWithDefaults = Required<
+  Omit<BaseDiffOptions, 'unsafeCSS' | 'preferredHighlighter'>
+>;
+
+export type CustomPreProperties = Record<string, string | number | undefined>;
+
 // NOTE(amadeus): This is the shared config that all `pre` nodes will need to
 // get setup properly. Whether it's via direct DOM manipulation or via HAST
 // html rendering, this interface can be shared across both of these areas.
@@ -395,6 +401,7 @@ export interface PrePropertiesConfig extends Required<
   split: boolean;
   themeStyles: string;
   totalLines: number;
+  customProperties?: CustomPreProperties;
 }
 
 export interface RenderHeaderMetadataProps {
@@ -432,6 +439,25 @@ export type DiffLineAnnotation<T = undefined> = {
   side: AnnotationSide;
   lineNumber: number;
 } & OptionalMetadata<T>;
+
+export type MergeConflictResolution = 'current' | 'incoming' | 'both';
+
+export interface MergeConflictRegion {
+  conflictIndex: number;
+  startLineIndex: number;
+  startLineNumber: number;
+  separatorLineIndex: number;
+  separatorLineNumber: number;
+  endLineIndex: number;
+  endLineNumber: number;
+  baseMarkerLineIndex?: number;
+  baseMarkerLineNumber?: number;
+}
+
+export interface MergeConflictActionPayload {
+  resolution: MergeConflictResolution;
+  conflict: MergeConflictRegion;
+}
 
 export interface GapSpan {
   type: 'gap';
@@ -631,4 +657,12 @@ export interface VirtualFileMetrics {
 export interface SelectionPoint {
   lineNumber: number;
   side: SelectionSide | undefined;
+}
+
+export interface MergeConflictMetadata {
+  side: AnnotationSide;
+  lineNumber: number;
+  type: 'merge-conflict-action';
+  conflict: MergeConflictRegion;
+  lineIndex: number;
 }

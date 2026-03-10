@@ -4,6 +4,7 @@
 export * from '../types';
 export * from './File';
 export * from './FileDiff';
+export * from './UnresolvedFile';
 export * from './MultiFileDiff';
 export * from './PatchDiff';
 export * from './Virtualizer';
