@@ -88,7 +88,6 @@ export interface MergeConflictActionTarget {
   kind: 'merge-conflict-action';
   resolution: MergeConflictResolution;
   conflictIndex: number;
-  lineIndex: number | undefined;
 }
 
 type ResolvedPointerTarget<TMode extends InteractionManagerMode> =
@@ -154,7 +153,7 @@ export interface InteractionManagerOptions<
   onHunkExpand?(
     hunkIndex: number,
     direction: ExpansionDirections,
-    expandFully?: boolean
+    expansionLineCountOverride?: number
   ): unknown;
   onMergeConflictActionClick?(target: MergeConflictActionTarget): void;
 }
@@ -435,7 +434,11 @@ export class InteractionManager<TMode extends InteractionManagerMode> {
           break;
         }
         if (isExpandoPointerTarget(target) && onHunkExpand != null) {
-          onHunkExpand(target.hunkIndex, target.direction, event.shiftKey);
+          onHunkExpand(
+            target.hunkIndex,
+            event.shiftKey ? 'both' : target.direction,
+            event.shiftKey ? Number.POSITIVE_INFINITY : undefined
+          );
           break;
         }
         if (!isLinePointerTarget(target)) {
@@ -1256,14 +1259,10 @@ export class InteractionManager<TMode extends InteractionManagerMode> {
         const conflictIndexValue =
           element.getAttribute('data-merge-conflict-conflict-index') ??
           undefined;
-        const lineIndexValue =
-          element.getAttribute('data-merge-conflict-line-index') ?? undefined;
         const conflictIndex =
           conflictIndexValue != null
             ? Number.parseInt(conflictIndexValue, 10)
             : Number.NaN;
-        const lineIndex =
-          lineIndexValue != null ? Number.parseInt(lineIndexValue, 10) : NaN;
         if (
           isMergeConflictResolution(resolutionValue) &&
           Number.isFinite(conflictIndex)
@@ -1272,7 +1271,6 @@ export class InteractionManager<TMode extends InteractionManagerMode> {
             kind: 'merge-conflict-action',
             resolution: resolutionValue,
             conflictIndex,
-            lineIndex: Number.isFinite(lineIndex) ? lineIndex : undefined,
           };
         }
       }
@@ -1470,7 +1468,7 @@ export function pluckInteractionOptions<TMode extends InteractionManagerMode>(
   onHunkExpand?: (
     hunkIndex: number,
     direction: ExpansionDirections,
-    expandFully?: boolean
+    expansionLineCount?: number
   ) => unknown,
   getLineIndex?: GetLineIndexUtility,
   onMergeConflictActionClick?: (target: MergeConflictActionTarget) => void

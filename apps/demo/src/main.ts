@@ -14,6 +14,7 @@ import {
   type ParsedPatch,
   parsePatchFiles,
   preloadHighlighter,
+  UnresolvedFile,
   VirtualizedFile,
   VirtualizedFileDiff,
   Virtualizer,
@@ -24,6 +25,7 @@ import {
   CodeConfigs,
   FAKE_DIFF_LINE_ANNOTATIONS,
   FAKE_LINE_ANNOTATIONS,
+  FILE_CONFLICT,
   FILE_NEW,
   FILE_OLD,
   type LineCommentMetadata,
@@ -40,22 +42,22 @@ const diffInstances: (
   | FileDiff<LineCommentMetadata>
   | VirtualizedFileDiff<LineCommentMetadata>
 )[] = [];
-const fileInstances: File<unknown>[] = [];
+const fileInstances: File<LineCommentMetadata>[] = [];
 const streamingInstances: FileStream[] = [];
+const conflictInstances: UnresolvedFile<LineCommentMetadata>[] = [];
 
 function cleanupInstances(container: HTMLElement) {
-  for (const instance of diffInstances) {
-    instance.cleanUp();
+  for (const instances of [
+    diffInstances,
+    fileInstances,
+    streamingInstances,
+    conflictInstances,
+  ]) {
+    for (const instance of instances) {
+      instance.cleanUp();
+    }
+    instances.length = 0;
   }
-  for (const instance of fileInstances) {
-    instance.cleanUp();
-  }
-  for (const instance of streamingInstances) {
-    instance.cleanUp();
-  }
-  diffInstances.length = 0;
-  fileInstances.length = 0;
-  streamingInstances.length = 0;
   container.innerHTML = '';
   delete container.dataset.diff;
 }
@@ -123,12 +125,8 @@ function renderDiff(parsedPatches: ParsedPatch[], manager?: WorkerPoolManager) {
   cleanupInstances(wrapper);
   wrapper.dataset.diff = '';
 
-  const checkbox = document.getElementById('unified') as
-    | HTMLInputElement
-    | undefined;
-  const unified = checkbox?.checked ?? false;
-  const wrap =
-    wrapCheckbox instanceof HTMLInputElement ? wrapCheckbox.checked : false;
+  const unified = getUnified();
+  const wrap = getWrapped();
   let patchIndex = 0;
   const themeType = getThemeType();
 
@@ -404,6 +402,11 @@ if (loadDiff != null) {
 }
 
 const wrapCheckbox = document.getElementById('wrap-lines');
+function getWrapped(): boolean {
+  return wrapCheckbox instanceof HTMLInputElement
+    ? wrapCheckbox.checked
+    : false;
+}
 if (wrapCheckbox != null) {
   wrapCheckbox.addEventListener('change', ({ currentTarget }) => {
     if (!(currentTarget instanceof HTMLInputElement)) {
@@ -430,6 +433,11 @@ if (wrapCheckbox != null) {
 }
 
 const unifiedCheckbox = document.getElementById('unified');
+function getUnified(): boolean {
+  return unifiedCheckbox instanceof HTMLInputElement
+    ? unifiedCheckbox.checked
+    : false;
+}
 if (unifiedCheckbox instanceof HTMLInputElement) {
   unifiedCheckbox.addEventListener('change', () => {
     const checked = unifiedCheckbox.checked;
@@ -450,7 +458,7 @@ const diff2Files = document.getElementById('diff-files');
 if (diff2Files != null) {
   diff2Files.addEventListener('click', () => {
     if (lastWrapper != null) {
-      lastWrapper.parentElement?.removeChild(lastWrapper);
+      lastWrapper.remove();
     }
     lastWrapper = document.createElement('div');
 
@@ -498,7 +506,7 @@ if (diff2Files != null) {
         cacheKey: `new-${fileNewContents.value}`,
       };
 
-      lastWrapper?.parentNode?.removeChild(lastWrapper);
+      lastWrapper?.remove();
       const parsed = parseDiffFromFile(oldFile, newFile);
       console.log('ZZZZZ - parsed', parsed);
       renderDiff([{ files: [parsed] }], poolManager);
@@ -510,7 +518,7 @@ if (diff2Files != null) {
     bottomWrapper.appendChild(cancel);
 
     cancel.addEventListener('click', () => {
-      lastWrapper?.parentNode?.removeChild(lastWrapper);
+      lastWrapper?.remove();
     });
 
     lastWrapper.append(bottomWrapper);
@@ -571,19 +579,22 @@ const fileExample: FileContents | Promise<FileContents> = (() => {
   };
 })();
 
+const fileConflict: FileContents = {
+  name: 'file.ts',
+  contents: FILE_CONFLICT,
+};
+
 const renderFileButton = document.getElementById('render-file');
 if (renderFileButton != null) {
-  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+  // oxlint-disable-next-line @typescript-oxlint/no-misused-promises
   renderFileButton.addEventListener('click', async () => {
     const file = await fileExample;
     const wrapper = document.getElementById('wrapper');
     if (wrapper == null) return;
     cleanupInstances(wrapper);
 
-    const wrap =
-      wrapCheckbox instanceof HTMLInputElement ? wrapCheckbox.checked : false;
-
     virtualizer?.setup(globalThis.document);
+    const wrap = getWrapped();
     const fileContainer = document.createElement(DIFFS_TAG_NAME);
     wrapper.appendChild(fileContainer);
     let instance:
@@ -675,13 +686,43 @@ if (renderFileButton != null) {
         return new File<LineCommentMetadata>(options, poolManager);
       }
     })();
-
-    void instance.render({
+    instance.render({
       file,
       lineAnnotations: FAKE_LINE_ANNOTATIONS,
       fileContainer,
     });
     fileInstances.push(instance);
+  });
+}
+
+const renderFileConflictButton = document.getElementById('render-conflict');
+if (renderFileConflictButton != null) {
+  renderFileConflictButton.addEventListener('click', () => {
+    const wrapper = document.getElementById('wrapper');
+    if (wrapper == null) {
+      return;
+    }
+    cleanupInstances(wrapper);
+    const wrap = getWrapped();
+    const fileContainer = document.createElement(DIFFS_TAG_NAME);
+    wrapper.appendChild(fileContainer);
+    const instance = new UnresolvedFile<LineCommentMetadata>(
+      {
+        theme: DEFAULT_THEMES,
+        themeType: getThemeType(),
+        overflow: wrap ? 'wrap' : 'scroll',
+        renderAnnotation,
+        enableLineSelection: true,
+        enableGutterUtility: true,
+      },
+      poolManager
+    );
+    instance.render({
+      file: fileConflict,
+      // lineAnnotations: FAKE_DIFF_LINE_ANNOTATIONS[0][0],
+      fileContainer,
+    });
+    conflictInstances.push(instance);
   });
 }
 

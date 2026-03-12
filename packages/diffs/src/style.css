@@ -1033,7 +1033,6 @@
     --diffs-line-bg: var(--diffs-bg);
   }
 
-  [data-has-merge-conflict] [data-merge-conflict-actions],
   [data-has-merge-conflict] [data-gutter-buffer='merge-conflict-action'] {
     --diffs-line-bg: var(--diffs-bg);
   }
@@ -1044,7 +1043,6 @@
   }
 
   [data-merge-conflict-actions] {
-    min-height: var(--diffs-annotation-min-height, 0);
     z-index: 2;
   }
 
@@ -1518,6 +1516,14 @@
 
   [data-merge-conflict-action]:hover {
     color: var(--diffs-fg);
+  }
+
+  [data-merge-conflict-action='current']:hover {
+    color: var(--diffs-addition-base);
+  }
+
+  [data-merge-conflict-action='incoming']:hover {
+    color: var(--diffs-modified-base);
   }
 
   [data-merge-conflict-action-separator] {

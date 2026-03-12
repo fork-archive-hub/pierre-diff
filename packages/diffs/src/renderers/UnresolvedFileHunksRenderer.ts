@@ -1,4 +1,4 @@
-import type { ElementContent, Element as HASTElement, Properties } from 'hast';
+import type { Element as HASTElement, Properties } from 'hast';
 
 import { DEFAULT_RENDER_RANGE, DEFAULT_THEMES } from '../constants';
 import type {
@@ -6,7 +6,6 @@ import type {
   BaseDiffOptionsWithDefaults,
   DiffLineAnnotation,
   FileDiffMetadata,
-  MergeConflictMetadata,
   MergeConflictResolution,
   RenderRange,
 } from '../types';
@@ -16,11 +15,17 @@ import {
   createHastElement,
   createTextNodeElement,
 } from '../utils/hast_utils';
+import {
+  getMergeConflictActionAnchor,
+  type MergeConflictDiffAction,
+} from '../utils/parseMergeConflictDiffFromFile';
 import type { WorkerPoolManager } from '../worker';
 import {
   DiffHunksRenderer,
   type HunksRenderResult,
+  type InlineRow,
   type LineDecoration,
+  type RenderedLineContext,
   type SplitLineDecorationProps,
   type UnifiedLineDecorationProps,
 } from './DiffHunksRenderer';
@@ -38,10 +43,10 @@ interface MergeConflictActionRowData {
   side: DiffLineAnnotation<undefined>['side'];
   lineNumber: number;
   conflictIndex: number;
-  lineIndex: number;
-  rowKey: string;
-  slotName: string;
-  sourceIndex: number;
+}
+
+interface BaseUnresolvedOptionsWithDefaults extends BaseDiffOptionsWithDefaults {
+  mergeConflictActionsType: MergeConflictActionsType;
 }
 
 type MergeConflictActionsType = 'none' | 'default' | 'custom';
@@ -60,7 +65,7 @@ export class UnresolvedFileHunksRenderer<
 > extends DiffHunksRenderer<LAnnotation> {
   private cachedAdditionLines: string[] | undefined;
   private cachedDeletionLines: string[] | undefined;
-  private conflictAnnotations: MergeConflictActionRowData[] = [];
+  private conflictActions = new Map<string, MergeConflictActionRowData[]>();
   private additionMarkerLookup: MergeConflictMarkerLookup[] = [];
   private deletionMarkerLookup: MergeConflictMarkerLookup[] = [];
   public override options: UnresolvedFileHunksRendererOptions;
@@ -76,42 +81,36 @@ export class UnresolvedFileHunksRenderer<
     this.options = options;
   }
 
-  public setConflictAnnotations(
-    conflictAnnotations: MergeConflictMetadata[]
-  ): void {
-    this.conflictAnnotations.length = 0;
-    for (
-      let sourceIndex = 0;
-      sourceIndex < conflictAnnotations.length;
-      sourceIndex++
-    ) {
-      const annotation = conflictAnnotations[sourceIndex];
-      const conflictIndex = annotation.conflict.conflictIndex;
-      this.conflictAnnotations.push({
-        side: annotation.side,
-        lineNumber: annotation.lineNumber,
-        conflictIndex,
-        lineIndex: annotation.lineIndex,
-        rowKey: `${conflictIndex},${annotation.lineIndex}`,
-        slotName: getMergeConflictActionSlotName({
-          side: annotation.side,
-          lineNumber: annotation.lineNumber,
-          conflictIndex,
-        }),
-        sourceIndex,
-      });
+  public setConflictActions(conflictActions: MergeConflictDiffAction[]): void {
+    this.conflictActions.clear();
+    for (const action of conflictActions) {
+      const anchor = getMergeConflictActionAnchor(action);
+      if (anchor == null) {
+        continue;
+      }
+      const row = {
+        side: anchor.side,
+        lineNumber: anchor.lineNumber,
+        conflictIndex: action.conflictIndex,
+      };
+      const key = `${row.side}:${row.lineNumber}`;
+      const rows = this.conflictActions.get(key);
+      if (rows == null) {
+        this.conflictActions.set(key, [row]);
+      } else {
+        rows.push(row);
+      }
     }
   }
 
   public override renderDiff(
-    diff: FileDiffMetadata | undefined = undefined,
+    diff?: FileDiffMetadata | undefined,
     renderRange: RenderRange = DEFAULT_RENDER_RANGE
   ): HunksRenderResult | undefined {
     if (diff != null) {
       this.prepareMarkerLookups(diff);
     }
-    const result = super.renderDiff(diff, renderRange);
-    return this.injectMergeConflictActionRows(result);
+    return super.renderDiff(diff, renderRange);
   }
 
   public override async asyncRender(
@@ -119,8 +118,7 @@ export class UnresolvedFileHunksRenderer<
     renderRange: RenderRange = DEFAULT_RENDER_RANGE
   ): Promise<HunksRenderResult> {
     this.prepareMarkerLookups(diff);
-    const result = await super.asyncRender(diff, renderRange);
-    return this.injectMergeConflictActionRows(result) ?? result;
+    return super.asyncRender(diff, renderRange);
   }
 
   protected override createPreElement(
@@ -188,6 +186,32 @@ export class UnresolvedFileHunksRenderer<
     };
   }
 
+  protected override getUnifiedInlineRowsForLine = (
+    ctx: RenderedLineContext
+  ): InlineRow[] | undefined => {
+    const side = getUnifiedRenderedSide(ctx);
+    const lineNumber =
+      side === 'deletions'
+        ? ctx.deletionLine?.lineNumber
+        : ctx.additionLine?.lineNumber;
+    if (lineNumber == null) {
+      return undefined;
+    }
+    const rows = this.conflictActions.get(`${side}:${lineNumber}`);
+    if (rows == null || rows.length === 0) {
+      return undefined;
+    }
+    const { mergeConflictActionsType } = this.getOptionsWithDefaults();
+    return rows.map((row) => ({
+      content: createMergeConflictActionsRowElement({
+        row,
+        includeDefaultActions: mergeConflictActionsType === 'default',
+        includeSlot: true,
+      }),
+      gutter: createMergeConflictGutterGap(),
+    }));
+  };
+
   private prepareMarkerLookups(diff: FileDiffMetadata): void {
     if (this.cachedAdditionLines !== diff.additionLines) {
       this.cachedAdditionLines = diff.additionLines;
@@ -217,161 +241,14 @@ export class UnresolvedFileHunksRenderer<
     return value === 'none' ? undefined : value;
   }
 
-  // REFACTOR OPPORTUNITY: Can we inject as we are building the dom :thonk:
-  private injectMergeConflictActionRows(
-    result: HunksRenderResult | undefined
-  ): HunksRenderResult | undefined {
-    if (result == null || this.conflictAnnotations.length === 0) {
-      return result;
-    }
-    if (this.conflictAnnotations.length === 0) {
-      return result;
-    }
-    const insertedRows =
-      result.unifiedContentAST != null
-        ? this.injectUnifiedMergeConflictActionRows(
-            result,
-            this.conflictAnnotations
-          )
-        : this.injectSplitMergeConflictActionRows(
-            result,
-            this.conflictAnnotations
-          );
-    if (insertedRows > 0) {
-      result.rowCount += insertedRows;
-    }
-    return result;
-  }
-
-  private injectUnifiedMergeConflictActionRows(
-    result: HunksRenderResult,
-    actionRows: MergeConflictActionRowData[]
-  ): number {
-    const { mergeConflictActionsType = 'default' } = this.options;
-    const { unifiedContentAST, unifiedGutterAST } = result;
-    if (unifiedContentAST == null || unifiedGutterAST == null) {
-      return 0;
-    }
-    const insertionBySideAndLine =
-      buildUnifiedLineInsertionIndexMap(unifiedContentAST);
-    const targets = [];
-    for (const row of actionRows) {
-      const insertionIndex = insertionBySideAndLine.get(
-        `${row.side}:${row.lineNumber}`
-      );
-      if (insertionIndex == null) {
-        continue;
-      }
-      targets.push({ row, insertionIndex, sourceIndex: row.sourceIndex });
-    }
-    targets.sort((a, b) => {
-      if (a.insertionIndex !== b.insertionIndex) {
-        return b.insertionIndex - a.insertionIndex;
-      }
-      return b.sourceIndex - a.sourceIndex;
-    });
-    for (const { row, insertionIndex } of targets) {
-      unifiedContentAST.splice(
-        insertionIndex,
-        0,
-        createMergeConflictActionsRowElement({
-          row,
-          includeDefaultActions: mergeConflictActionsType === 'default',
-          includeSlot: true,
-        })
-      );
-      unifiedGutterAST.splice(
-        insertionIndex,
-        0,
-        createMergeConflictGutterGap()
-      );
-    }
-    return targets.length;
-  }
-
-  private injectSplitMergeConflictActionRows(
-    result: HunksRenderResult,
-    actionRows: MergeConflictActionRowData[]
-  ): number {
-    const { mergeConflictActionsType = 'default' } = this.options;
-    const {
-      additionsContentAST,
-      additionsGutterAST,
-      deletionsContentAST,
-      deletionsGutterAST,
-    } = result;
-    if (
-      additionsContentAST == null ||
-      additionsGutterAST == null ||
-      deletionsContentAST == null ||
-      deletionsGutterAST == null
-    ) {
-      return 0;
-    }
-    const additionsInsertionByLine =
-      buildSplitLineInsertionIndexMap(additionsContentAST);
-    const deletionsInsertionByLine =
-      buildSplitLineInsertionIndexMap(deletionsContentAST);
-    const targets = [];
-    for (const row of actionRows) {
-      const insertionIndex =
-        row.side === 'additions'
-          ? additionsInsertionByLine.get(row.lineNumber)
-          : deletionsInsertionByLine.get(row.lineNumber);
-      if (insertionIndex == null) {
-        continue;
-      }
-      targets.push({ row, insertionIndex, sourceIndex: row.sourceIndex });
-    }
-    targets.sort((a, b) => {
-      if (a.insertionIndex !== b.insertionIndex) {
-        return b.insertionIndex - a.insertionIndex;
-      }
-      return b.sourceIndex - a.sourceIndex;
-    });
-    for (const { row, insertionIndex } of targets) {
-      const isAdditionTarget = row.side === 'additions';
-      const targetContentAST = isAdditionTarget
-        ? additionsContentAST
-        : deletionsContentAST;
-      const targetGutterAST = isAdditionTarget
-        ? additionsGutterAST
-        : deletionsGutterAST;
-      const otherContentAST = isAdditionTarget
-        ? deletionsContentAST
-        : additionsContentAST;
-      const otherGutterAST = isAdditionTarget
-        ? deletionsGutterAST
-        : additionsGutterAST;
-      targetContentAST.splice(
-        insertionIndex,
-        0,
-        createMergeConflictActionsRowElement({
-          row,
-          includeDefaultActions: mergeConflictActionsType === 'default',
-          includeSlot: true,
-        })
-      );
-      targetGutterAST.splice(insertionIndex, 0, createMergeConflictGutterGap());
-      otherContentAST.splice(
-        insertionIndex,
-        0,
-        createMergeConflictActionsRowElement({
-          row,
-          includeDefaultActions: false,
-          includeSlot: false,
-        })
-      );
-      otherGutterAST.splice(insertionIndex, 0, createMergeConflictGutterGap());
-    }
-    return targets.length;
-  }
-
-  protected override getOptionsWithDefaults(): BaseDiffOptionsWithDefaults {
+  protected override getOptionsWithDefaults(): BaseUnresolvedOptionsWithDefaults {
     const options = super.getOptionsWithDefaults();
     options.diffStyle = 'unified';
     options.lineDiffType = 'none';
-    return options;
+    // NOTE(amadeus): Aint nobody got time for a spread
+    (options as BaseUnresolvedOptionsWithDefaults).mergeConflictActionsType =
+      this.options.mergeConflictActionsType ?? 'default';
+    return options as BaseUnresolvedOptionsWithDefaults;
   }
 }
 
@@ -432,118 +309,17 @@ function buildMarkerLookup(lines: string[]): MergeConflictMarkerLookup[] {
   return markerLookup;
 }
 
-function buildSplitLineInsertionIndexMap(
-  rows: ElementContent[]
-): Map<number, number> {
-  const map = new Map<number, number>();
-  let currentLineNumber: number | undefined;
-  for (let index = 0; index < rows.length; index++) {
-    const row = rows[index];
-    if (!isHastElement(row)) {
-      continue;
-    }
-    const lineNumber = getNumericProperty(row, 'data-line');
-    if (lineNumber != null) {
-      currentLineNumber = lineNumber;
-      map.set(lineNumber, index + 1);
-      continue;
-    }
-    if (
-      currentLineNumber != null &&
-      isInlineMetadataRow(row) &&
-      !hasNoNewlineMetadata(row)
-    ) {
-      map.set(currentLineNumber, index + 1);
-      continue;
-    }
-    currentLineNumber = undefined;
-  }
-  return map;
-}
-
-function buildUnifiedLineInsertionIndexMap(
-  rows: ElementContent[]
-): Map<string, number> {
-  const map = new Map<string, number>();
-  let currentKey: string | undefined;
-  for (let index = 0; index < rows.length; index++) {
-    const row = rows[index];
-    if (!isHastElement(row)) {
-      continue;
-    }
-    const lineNumber = getNumericProperty(row, 'data-line');
-    const side = getUnifiedRowSide(row);
-    if (lineNumber != null && side != null) {
-      currentKey = `${side}:${lineNumber}`;
-      map.set(currentKey, index + 1);
-      continue;
-    }
-    if (
-      currentKey != null &&
-      isInlineMetadataRow(row) &&
-      !hasNoNewlineMetadata(row)
-    ) {
-      map.set(currentKey, index + 1);
-      continue;
-    }
-    currentKey = undefined;
-  }
-  return map;
-}
-
-function getUnifiedRowSide(
-  row: HASTElement
-): DiffLineAnnotation<undefined>['side'] | undefined {
-  const lineType = getStringProperty(row, 'data-line-type');
-  if (lineType == null) {
-    return undefined;
-  }
-  if (lineType === 'change-deletion') {
+function getUnifiedRenderedSide(
+  ctx: RenderedLineContext
+): DiffLineAnnotation<undefined>['side'] {
+  if (
+    ctx.type === 'change' &&
+    ctx.deletionLine != null &&
+    ctx.additionLine == null
+  ) {
     return 'deletions';
   }
   return 'additions';
-}
-
-function isInlineMetadataRow(row: HASTElement): boolean {
-  const properties = row.properties;
-  return (
-    properties != null &&
-    ('data-line-annotation' in properties ||
-      'data-merge-conflict-actions' in properties)
-  );
-}
-
-function hasNoNewlineMetadata(row: HASTElement): boolean {
-  return row.properties != null && 'data-no-newline' in row.properties;
-}
-
-function isHastElement(node: ElementContent): node is HASTElement {
-  return node.type === 'element';
-}
-
-function getStringProperty(row: HASTElement, key: string): string | undefined {
-  const value = row.properties?.[key];
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (typeof value === 'number') {
-    return `${value}`;
-  }
-  return undefined;
-}
-
-function getNumericProperty(row: HASTElement, key: string): number | undefined {
-  const value = row.properties?.[key];
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === 'string' && value !== '') {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return undefined;
 }
 
 function createMergeConflictGutterGap(): HASTElement {
@@ -564,14 +340,18 @@ function createMergeConflictActionsRowElement({
   includeSlot,
 }: CreateMergeConflictActionsRowElementProps): HASTElement {
   const contentChildren: HASTElement[] = includeDefaultActions
-    ? createMergeConflictActionsContent(row)
+    ? createMergeConflictActionsContent(row.conflictIndex)
     : [];
   if (includeSlot) {
     contentChildren.push(
       createHastElement({
         tagName: 'slot',
         properties: {
-          name: row.slotName,
+          name: getMergeConflictActionSlotName({
+            side: row.side,
+            lineNumber: row.lineNumber,
+            conflictIndex: row.conflictIndex,
+          }),
           'data-merge-conflict-action-slot': '',
         },
       })
@@ -580,9 +360,7 @@ function createMergeConflictActionsRowElement({
   return createHastElement({
     tagName: 'div',
     properties: {
-      'data-merge-conflict-actions': row.rowKey,
-      'data-merge-conflict-actions-empty':
-        !includeDefaultActions && !includeSlot ? '' : undefined,
+      'data-merge-conflict-actions': '',
     },
     children: [
       createHastElement({
@@ -595,29 +373,25 @@ function createMergeConflictActionsRowElement({
 }
 
 function createMergeConflictActionsContent(
-  row: Pick<MergeConflictActionRowData, 'conflictIndex' | 'lineIndex'>
+  conflictIndex: number
 ): HASTElement[] {
-  const { conflictIndex, lineIndex } = row;
   return [
     createMergeConflictActionButton({
       resolution: 'current',
       label: 'Accept current change',
       conflictIndex,
-      lineIndex,
     }),
     createMergeConflictActionSeparator(),
     createMergeConflictActionButton({
       resolution: 'incoming',
       label: 'Accept incoming change',
       conflictIndex,
-      lineIndex,
     }),
     createMergeConflictActionSeparator(),
     createMergeConflictActionButton({
       resolution: 'both',
       label: 'Accept both',
       conflictIndex,
-      lineIndex,
     }),
   ];
 }
@@ -626,14 +400,12 @@ interface CreateMergeConflictActionButtonProps {
   resolution: MergeConflictResolution;
   label: string;
   conflictIndex: number;
-  lineIndex: number;
 }
 
 function createMergeConflictActionButton({
   resolution,
   label,
   conflictIndex,
-  lineIndex,
 }: CreateMergeConflictActionButtonProps): HASTElement {
   return createHastElement({
     tagName: 'button',
@@ -641,7 +413,6 @@ function createMergeConflictActionButton({
       type: 'button',
       'data-merge-conflict-action': resolution,
       'data-merge-conflict-conflict-index': `${conflictIndex}`,
-      'data-merge-conflict-line-index': `${lineIndex}`,
     },
     children: [createTextNodeElement(label)],
   });
